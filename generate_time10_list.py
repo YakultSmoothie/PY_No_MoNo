@@ -33,4 +33,4 @@ def generate_time10_list(start_time: str, end_time: str, interval: int):
 
 
 # 測試
-# print(generate_time_codes("2025073001", "2025073003", 1))
+# print(generate_time10_list("2025073001", "2025073003", 1))
