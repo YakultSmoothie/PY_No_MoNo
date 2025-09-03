@@ -50,7 +50,7 @@ def parse_arguments():
   # 當地時間轉UTC時間 (台灣時間 UTC+8)
   python3 create_station_spatial_interpolation.py -i ./data_station.txt -i2 ./data_pp01.txt -V PP01 -T 2025073108 -utc +8
 
-作者: CYC
+作者: CYC 2025-09-03 [v1.0]
         """)
 
     parser.add_argument('-i', '--input', required=True, help='測站基本資訊檔案路徑 (必要參數)')
