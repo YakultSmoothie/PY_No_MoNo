@@ -771,9 +771,14 @@ def create_interpolation_visualization(df_integrated, grid_info, interpolated_gr
         gl.top_labels = False      # 不在上方顯示經度標籤
         gl.right_labels = False    # 不在右邊顯示緯度標籤
 
-    # 測站觀測值為準 set color：
+    # set color：
     vmin = df_integrated[target_variable].min()
     vmax = df_integrated[target_variable].max()
+    # vmin2 = np.min(interpolated_grid)
+    # vmax2 = np.max(interpolated_grid)
+    # vmin = min(vmin, vmin2)
+    # vmax = max(vmax, vmax2)
+
 
     # 建立一個共用的 norm for color
     norm = clr.Normalize(vmin=vmin, vmax=vmax)
@@ -791,8 +796,8 @@ def create_interpolation_visualization(df_integrated, grid_info, interpolated_gr
                  fontsize=FONT_SIZE * 1.1)
     
     # 右圖：contourf 使用 norm
-    contour = ax2.contourf(grid_info['lon_mesh'], grid_info['lat_mesh'], 
-                          interpolated_grid, cmap='RdYlBu_r',
+    contour = ax2.pcolormesh(grid_info['lon_mesh'], grid_info['lat_mesh'], 
+                          interpolated_grid, cmap='RdYlBu_r', 
                           transform=ccrs.PlateCarree(), zorder=1,
                           norm=norm)
     
