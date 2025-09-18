@@ -1,5 +1,3 @@
-# myfunction.py
-
 #--------------------------------------------
 # 輸入一個np陣列快數看看結果
 #--------------------------------------------
@@ -10,6 +8,13 @@ def plot_2D_shaded(array, levels=None, cmap='viridis', figsize=(10, 8),
     print(f"\n=== run plot_2D_shaded ===")
     '''
     快速將NumPy陣列繪製成2D圖像進行可視化分析
+    
+    參數:
+        array (numpy.ndarray/xarray.DataArray/pint.Quantity): 2D數組，支援多種格式
+        ... (其他參數保持不變)
+    
+    v1.1 2025-09-18 支援xarray和pint單位自動轉換
+    v1.0 2025-03-09 YakultSmoothie and Claude(CA)
     
     參數:
         array (numpy.ndarray): 2D數組
@@ -30,7 +35,7 @@ def plot_2D_shaded(array, levels=None, cmap='viridis', figsize=(10, 8),
         matplotlib.axes.Axes: 產生的Axes物件
         dict: 包含所有統計資訊的字典
     
-    v1.0 2025-03-09 YakultSmoothie and Claude(CA)
+
     '''
     import numpy as np
     import matplotlib.pyplot as plt
@@ -41,12 +46,39 @@ def plot_2D_shaded(array, levels=None, cmap='viridis', figsize=(10, 8),
     plt.rcParams['font.sans-serif'] = ['DejaVu Sans']  # 或 'DejaVu Sans'，避免找不到字型
     plt.rcParams['axes.unicode_minus'] = False  # 確保負號正常顯示
     
-    # 檢查輸入數據
+    # 自動處理不同類型的輸入數據
+    original_array = array  # 保存原始輸入以備後用
+    
+    # 處理xarray DataArray
+    if hasattr(array, 'data'):  # xarray DataArray
+        if not silent:
+            print(f"檢測到xarray DataArray, 自動提取.data")
+        array = array.data
+    
+    # 處理pint Quantity (帶單位的數據)
+    if hasattr(array, 'magnitude'):  # pint Quantity
+        if not silent:
+            unit_str = getattr(array, 'units', 'unknown')
+            print(f"檢測到pint Quantity, 單位: {unit_str}，自動提取.magnitude")
+        array = array.magnitude
+    
+    # 處理pandas DataFrame/Series
+    if hasattr(array, 'values'):  # pandas
+        if not silent:
+            print(f"檢測到pandas物件, 自動提取.values")
+        array = array.values
+    
+    # 確保最終結果是numpy陣列
     if not isinstance(array, np.ndarray):
-        raise TypeError("輸入必須是NumPy陣列")
+        try:
+            array = np.array(array)
+            if not silent:
+                print(f"已將輸入轉換為numpy陣列")
+        except:
+            raise TypeError(f"無法將輸入轉換為NumPy陣列, 輸入類型: {type(original_array)}")
     
     if array.ndim != 2:
-        raise ValueError(f"輸入必須是2D陣列，目前維度為{array.ndim}")
+        raise ValueError(f"輸入必須是2D陣列, 目前維度為{array.ndim}")
     
     # 獲取數組維度
     rows, cols = array.shape
@@ -80,7 +112,7 @@ def plot_2D_shaded(array, levels=None, cmap='viridis', figsize=(10, 8),
     else:
         stats['min'] = stats['max'] = stats['mean'] = stats['std'] = stats['q1'] = stats['q2'] = stats['q3'] = np.nan
         if not silent:
-            print("\n統計摘要: 無有效數據（全部為NaN）")
+            print("\n統計摘要: 無有效數據(全部為NaN)")
     
     # 增加統計NaN值數量
     stats['nan_count'] = nan_count = np.count_nonzero(np.isnan(array))
@@ -101,7 +133,7 @@ def plot_2D_shaded(array, levels=None, cmap='viridis', figsize=(10, 8),
         else:
             levels = np.linspace(-1, 1, 11)  # 默認範圍
     
-    # 設置colormap，讓NaN值顯示為黑色
+    # 設置colormap, 讓NaN值顯示為黑色
     if not silent:
         print(f"\n繪圖設定:")
         print(f"  使用色彩映射: {cmap}")
