@@ -114,28 +114,9 @@ def example_usage():
     print(f"    Mean area: {np.mean(area_global):.1f}")
     print(f"    Area range: {np.nanmin(area_global):.1f} to {np.nanmax(area_global):.1f}")
     print(f"    Theoretical Earth area: ~510 million km²")
-    
-    # 範例2: 東亞區域0.5度解析度格點
-    print("\nExample 2: East Asia region with 0.5-degree resolution")
-    print("-" * 55)
-    
-    lon_1d_ea = np.arange(100, 150.5, 0.5)  # 東經100-150度
-    lat_1d_ea = np.arange(20, 50.5, 0.5)    # 北緯20-50度
-    lon_ea, lat_ea = np.meshgrid(lon_1d_ea, lat_1d_ea)
-    
-    print(f"Processing East Asia grid with shape: {lon_ea.shape}")
-    print(f"Region bounds: {np.min(lon_ea):.1f}°-{np.max(lon_ea):.1f}°E, {np.min(lat_ea):.1f}°-{np.max(lat_ea):.1f}°N")
-    
-    area_ea = calc_grid_area(lon_ea, lat_ea)
-    
-    print(f"East Asia region area statistics:")
-    print(f"    Grid points: {area_ea.shape}")
-    print(f"    Region total area: {np.sum(area_ea):.1f}")
-    print(f"    Average grid cell area: {np.mean(area_ea):.1f}")
-    print(f"    Area range: {np.min(area_ea):.1f} to {np.max(area_ea):.1f}")
-        
-    # 範例5: 測試xarray DataArray輸入
-    print("\nExample 5: Testing with xarray DataArray input")
+              
+    # 範例2: 測試xarray DataArray輸入
+    print("\nExample 2: Testing with xarray DataArray input")
     print("-" * 44)
     
     import xarray as xr
@@ -172,11 +153,11 @@ def example_usage():
             area_at_lat = area_global[lat_idx, mid_lon_idx]
             print(f"    At {lat_val}°N: {area_at_lat:.1f}")
     
-    return area_global, area_ea
+    return area_global
 
 if __name__ == "__main__":
     # 執行範例
-    global_area, ea_area = example_usage()
+    global_area = example_usage()
     
     # 可選：顯示面積分布的統計資訊
     print("\n" + "="*60)
