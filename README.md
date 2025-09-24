@@ -7,4 +7,7 @@
 
 
 ## Tool
+| Function | Description | Link |
+|------|--------|------|
+| `view_npy.py -i ifn[ ...]` | Command-line tool for viewing and analyzing data files | [GitHub](https://github.com/YakultSmoothie/PY_No_MoNo/blob/main/view_npy.py) |
 
