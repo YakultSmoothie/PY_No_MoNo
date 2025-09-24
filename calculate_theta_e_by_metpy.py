@@ -11,7 +11,7 @@ import os
 # =============================
 LEVEL = 850                         # 氣壓層 (hPa)
 YEAR = 2022                         # 年份
-INPUT_FILE = f'/jet/ox/DATA/ERA5/M05-06/{YEAR}.pre.nc'
+INPUT_FILE = f'/DATA/ERA5/M05-06/{YEAR}.pre.nc'
 OUTPUT_DIR = f'./output/theta_e'
 OUTPUT_FILE = f'{OUTPUT_DIR}/theta_e_{LEVEL}hPa_{YEAR}.nc'
 
