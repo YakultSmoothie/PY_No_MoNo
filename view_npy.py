@@ -5,9 +5,10 @@
 # 檔名: view_npy.py
 # 功能: 查看numpy (.npy/.npz)和NetCDF檔案內容並提供基本統計與可視化功能
 # 作者: CYC
-# Create: 2025-04-01
-# Update: 2025-04-01 - 添加.nc和.npz文件支持以及變數選擇功能
-# Update: 2025-04-02 - 微調視覺化位置
+# Create(v1.0): 2025-04-01
+# Update(v1.1): 2025-04-01 - 添加.nc和.npz文件支持以及變數選擇功能
+# Update(v1.2): 2025-04-02 - 微調視覺化位置
+# Update(v1.2.1): 2025-09-24 - 微調Preview
 #
 # Description:
 #   此程式用於開啟、分析和可視化numpy和NetCDF文件。支持.npy, .npz和.nc格式，
@@ -314,7 +315,7 @@ def display_array_info(data, quiet=False):
         print("\nPreview (first few elements):")
         if data.ndim <= 2:
             # 對於低維數組，直接顯示前幾個元素
-            with np.printoptions(threshold=10, edgeitems=3):
+            with np.printoptions(threshold=100, edgeitems=5):
                 print(data)
         else:
             # 對於高維數組，顯示第一個切片的前幾個元素
