@@ -9,11 +9,13 @@
 # Update(v1.1): 2025-04-01 - 添加.nc和.npz文件支持以及變數選擇功能
 # Update(v1.2): 2025-04-02 - 微調視覺化位置
 # Update(v1.2.1): 2025-09-24 - 微調Preview
+# Update(v1.3): 2025-09-25 - 修改load_file在讀取時就應用索引切片
 #
 # Description:
 #   此程式用於開啟、分析和可視化numpy和NetCDF文件。支持.npy, .npz和.nc格式，
 #   提供數組基本信息、統計摘要、直方圖和熱圖等視覺化功能。
 #   支持自動檢測檔案類型或手動指定檔案類型。
+#   現在支持在載入時就應用索引切片，節省記憶體使用。
 # ============================================================================================
 
 import os
@@ -86,6 +88,29 @@ def detect_file_type(filepath):
         print(f"Error detecting file type: {str(e)}")
         return 'unknown'
 
+def parse_index_string(index_str):
+    """將索引字符串轉換為索引元組"""
+    if not index_str:
+        return None
+    
+    try:
+        indices = []
+        for idx in index_str.split(','):
+            if idx == ':':
+                indices.append(slice(None))
+            elif ':' in idx:
+                parts = idx.split(':')
+                start = int(parts[0]) if parts[0] else None
+                stop = int(parts[1]) if len(parts) > 1 and parts[1] else None
+                step = int(parts[2]) if len(parts) > 2 and parts[2] else None
+                indices.append(slice(start, stop, step))
+            else:
+                indices.append(int(idx))
+        return tuple(indices)
+    except Exception as e:
+        print(f"Error parsing index string '{index_str}': {str(e)}")
+        return None
+
 def parse_arguments(args=None):
     """解析命令列參數"""
     parser = argparse.ArgumentParser(
@@ -113,13 +138,12 @@ def parse_arguments(args=None):
   python3 view_npy.py -i data.npy -p hist -o histogram.png
 
   # 同時顯示多種信息和繪製圖形
-  python3 view_npy.py -i data.npy -s -p hist,heatmap,lineplot,contour -o output.png
+  python3 view_npy.py -s -p hist,heatmap,lineplot,contour -o output.png -i data.npy
 
-  # 指定索引並繪製
+  # 指定索引並繪製（現在在載入時就切片）
   python3 view_npy.py -i TZYX.npy -idx "5,0:20,:,250" -p heatmap -o slice_heatmap.png
 
 作者: CYC
-日期: 2025-04-01
         """)
 
     # 必要參數
@@ -143,7 +167,7 @@ def parse_arguments(args=None):
                        help='輸出圖形的檔名 (默認不保存)')
     parser.add_argument('-idx', '--index',
                        default=None,
-                       help='選擇數組的特定索引, 例如 "0,:,:"')
+                       help='選擇數組的特定索引, 例如 "0,:,:" (現在在載入時就應用)')
     
     parser.add_argument('-s', '--stats',
                        action='store_true',
@@ -168,13 +192,20 @@ def parse_arguments(args=None):
 
     return parser.parse_args(args)
 
-def load_file(filepath, file_type='auto', var_name=None, list_vars=False):
-    """載入文件並返回數組
+def load_file(filepath, file_type='auto', var_name=None, list_vars=False, index_slice=None):
+    """載入文件並返回數組，可在載入時應用索引切片
     
     支持的文件類型:
     - .npy: 單一NumPy數組
     - .npz: 壓縮的NumPy多數組文件
     - .nc: NetCDF文件
+    
+    Args:
+        filepath: 檔案路徑
+        file_type: 檔案類型
+        var_name: 變數名稱
+        list_vars: 是否只列出變數
+        index_slice: 索引切片元組，在載入時應用
     """
     try:
         print(f"Reading file: {filepath}")
@@ -191,10 +222,23 @@ def load_file(filepath, file_type='auto', var_name=None, list_vars=False):
         
         print(f"File type: {file_type}")
         
+        if index_slice:
+            print(f"Index slice will be applied during loading: {index_slice}")
+        
         # 根據檔案類型執行不同的讀取操作
         if file_type == '.npy':
+            # 對於.npy檔案，需要先載入後切片（NumPy的mmap可能在未來版本中支援更好的切片）
             data = np.load(filepath, allow_pickle=True)
-            print(f"File loaded successfully as NumPy array")
+            print(f"File loaded successfully as NumPy array (original shape: {data.shape})")
+            
+            # 應用索引切片
+            if index_slice:
+                try:
+                    data = data[index_slice]
+                    print(f"Applied indexing, new shape: {data.shape}")
+                except Exception as e:
+                    print(f"Warning: Could not apply index slice: {str(e)}")
+            
             return data
         
         elif file_type == '.npz':
@@ -220,9 +264,21 @@ def load_file(filepath, file_type='auto', var_name=None, list_vars=False):
                     raise ValueError("NPZ file does not contain any variables")
             
             if var_name in var_list:
-                data = npz_file[var_name]
-                print(f"Loaded variable '{var_name}' from NPZ file")
-                return data
+                # 先獲取完整數據
+                full_data = npz_file[var_name]
+                print(f"Loaded variable '{var_name}' from NPZ file (original shape: {full_data.shape})")
+                
+                # 應用索引切片
+                if index_slice:
+                    try:
+                        data = full_data[index_slice]
+                        print(f"Applied indexing, new shape: {data.shape}")
+                        return data
+                    except Exception as e:
+                        print(f"Warning: Could not apply index slice: {str(e)}")
+                        return full_data
+                else:
+                    return full_data
             else:
                 raise ValueError(f"Variable '{var_name}' not found in NPZ file. Available variables: {', '.join(var_list)}")
         
@@ -276,15 +332,32 @@ def load_file(filepath, file_type='auto', var_name=None, list_vars=False):
                     print(f"No variable specified, using first variable: '{var_name}'")
             
             if var_name in var_list:
-                # 讀取變數並轉換為NumPy數組
-                var_data = nc_file.variables[var_name][:]
+                # 讀取變數，可以直接應用索引切片
+                nc_var = nc_file.variables[var_name]
+                print(f"Variable '{var_name}' original shape: {nc_var.shape}")
                 
                 # 顯示單位信息
-                if hasattr(nc_file.variables[var_name], 'units'):
-                    print(f"Variable '{var_name}' units: {nc_file.variables[var_name].units}")
+                if hasattr(nc_var, 'units'):
+                    print(f"Variable '{var_name}' units: {nc_var.units}")
+                
+                # 應用索引切片
+                if index_slice:
+                    try:
+                        # NetCDF變數支持直接索引切片，這樣更記憶體效率
+                        var_data = nc_var[index_slice]
+                        print(f"Applied indexing during load, new shape: {var_data.shape}")
+                    except Exception as e:
+                        print(f"Warning: Could not apply index slice during load: {str(e)}")
+                        print("Loading full data and then applying slice...")
+                        var_data = nc_var[:]
+                        if index_slice:
+                            var_data = var_data[index_slice]
+                            print(f"Applied indexing after load, new shape: {var_data.shape}")
+                else:
+                    var_data = nc_var[:]
+                    print(f"Loaded complete variable '{var_name}' from NetCDF file")
                 
                 nc_file.close()
-                print(f"Loaded variable '{var_name}' from NetCDF file")
                 return var_data
             else:
                 nc_file.close()
@@ -303,12 +376,27 @@ def display_array_info(data, quiet=False):
     print("ARRAY INFORMATION")
     print("="*50)
     
+    # 檢查是否為 MaskedArray
+    is_masked = isinstance(data, np.ma.MaskedArray)
+    
     # 基本信息
-    print(f"Data type: {data.dtype}")
-    print(f"Shape: {data.shape}")
-    print(f"Dimensions: {data.ndim}")
-    print(f"Size: {data.size} elements")
-    print(f"Memory usage: {data.nbytes / (1024**2):.2f} MB")
+    if is_masked:
+        masked_count = np.ma.count_masked(data)  # 使用 np.ma.count_masked() 而不是 data.count_masked()
+        valid_count = data.count()  # 有效元素數量
+        
+        print(f"Data type: MaskedArray ({data.dtype})")
+        print(f"Shape: {data.shape}")
+        print(f"Dimensions: {data.ndim}")
+        print(f"Size: {data.size} elements")
+        print(f"Valid elements: {valid_count} ({valid_count/data.size*100:.2f}%)")
+        print(f"Masked elements: {masked_count} ({masked_count/data.size*100:.2f}%)")
+        print(f"Memory usage: {data.nbytes / (1024**2):.2f} MB")
+    else:
+        print(f"Data type: {data.dtype}")
+        print(f"Shape: {data.shape}")
+        print(f"Dimensions: {data.ndim}")
+        print(f"Size: {data.size} elements")
+        print(f"Memory usage: {data.nbytes / (1024**2):.2f} MB")
     
     # 顯示數組的前幾個元素(如果不是靜默模式)
     if not quiet:
@@ -337,57 +425,78 @@ def display_statistics(data):
         print("# STATISTICS SUMMARY")
         print("="*50)
         
-        # 計算基本統計量
-        print(f"Min value: {np.nanmin(data)}")
-        print(f"Max value: {np.nanmax(data)}")
-        print(f"Mean: {np.nanmean(data)}")
-        print(f"Median: {np.nanmedian(data)}")
-        print(f"Standard deviation: {np.nanstd(data)}")
+        # 檢查是否為 MaskedArray
+        is_masked = isinstance(data, np.ma.MaskedArray)
+        if is_masked:
+            print(f"Data type: MaskedArray")
+            # 對於 MaskedArray，使用有效數據進行統計
+            valid_data = data.compressed()  # 獲取未遮罩的數據
+            masked_count = np.ma.count_masked(data)  # 使用 np.ma.count_masked() 
+            valid_count = data.count()  # 有效元素數量
+            
+            print(f"Valid data count: {valid_count}")
+            print(f"Masked data count: {masked_count}")
+            
+            if len(valid_data) == 0:
+                print("Warning: All data is masked. Cannot compute statistics.")
+                return
+            
+            # 使用有效數據計算統計量
+            print(f"Min value: {valid_data.min()}")
+            print(f"Max value: {valid_data.max()}")
+            print(f"Mean: {valid_data.mean()}")
+            print(f"Median: {np.median(valid_data)}")
+            print(f"Standard deviation: {valid_data.std()}")
+            
+            # 計算空值和極值信息
+            nan_count = np.isnan(valid_data).sum()
+            inf_count = np.isinf(valid_data).sum()
+            zero_count = np.sum(valid_data == 0)
+            
+            print(f"\nMasked values: {masked_count} ({masked_count/data.size*100:.2f}%)")
+            print(f"NaN values (in valid data): {nan_count} ({nan_count/len(valid_data)*100:.2f}%)")
+            print(f"Infinite values (in valid data): {inf_count} ({inf_count/len(valid_data)*100:.2f}%)")
+            print(f"Zero values (in valid data): {zero_count} ({zero_count/len(valid_data)*100:.2f}%)")
+            
+            # 百分位數
+            percentiles = [0, 1, 5, 10, 25, 50, 75, 90, 95, 99, 100]
+            try:
+                p_values = np.percentile(valid_data, percentiles)
+                print("\nPercentiles:")
+                for p, v in zip(percentiles, p_values):
+                    print(f"  {p}%: {v}")
+            except Exception as e:
+                print(f"\nError computing percentiles: {str(e)}")
         
-        # 計算空值和極值信息
-        nan_count = np.isnan(data).sum()
-        inf_count = np.isinf(data).sum()
-        zero_count = np.sum(data == 0)
-        
-        print(f"\nNaN values: {nan_count} ({nan_count/data.size*100:.2f}%)")
-        print(f"Infinite values: {inf_count} ({inf_count/data.size*100:.2f}%)")
-        print(f"Zero values: {zero_count} ({zero_count/data.size*100:.2f}%)")
-        
-        # 百分位數
-        percentiles = [0, 1, 5, 10, 25, 50, 75, 90, 95, 99, 100]
-        p_values = np.nanpercentile(data, percentiles)
-        print("\nPercentiles:")
-        for p, v in zip(percentiles, p_values):
-            print(f"  {p}%: {v}")
+        else:
+            # 普通 ndarray 的處理
+            print(f"Data type: ndarray")
+            
+            # 計算基本統計量
+            print(f"Min value: {np.nanmin(data)}")
+            print(f"Max value: {np.nanmax(data)}")
+            print(f"Mean: {np.nanmean(data)}")
+            print(f"Median: {np.nanmedian(data)}")
+            print(f"Standard deviation: {np.nanstd(data)}")
+            
+            # 計算空值和極值信息
+            nan_count = np.isnan(data).sum()
+            inf_count = np.isinf(data).sum()
+            zero_count = np.sum(data == 0)
+            
+            print(f"\nNaN values: {nan_count} ({nan_count/data.size*100:.2f}%)")
+            print(f"Infinite values: {inf_count} ({inf_count/data.size*100:.2f}%)")
+            print(f"Zero values: {zero_count} ({zero_count/data.size*100:.2f}%)")
+            
+            # 百分位數
+            percentiles = [0, 1, 5, 10, 25, 50, 75, 90, 95, 99, 100]
+            p_values = np.nanpercentile(data, percentiles)
+            print("\nPercentiles:")
+            for p, v in zip(percentiles, p_values):
+                print(f"  {p}%: {v}")
     
     except Exception as e:
         print(f"\nError computing statistics: {str(e)}")
-
-def slice_array(data, index_str):
-    """根據提供的索引字符串切片數組"""
-    try:
-        if index_str:
-            # 將索引字符串轉換為索引元組
-            indices = []
-            for idx in index_str.split(','):
-                if idx == ':':
-                    indices.append(slice(None))
-                elif ':' in idx:
-                    start, stop = idx.split(':')
-                    start = int(start) if start else None
-                    stop = int(stop) if stop else None
-                    indices.append(slice(start, stop))
-                else:
-                    indices.append(int(idx))
-            
-            sliced_data = data[tuple(indices)]
-            print(f"\nSliced array with index [{index_str}]")
-            print(f"New shape: {sliced_data.shape}")
-            return sliced_data
-        return data
-    except Exception as e:
-        print(f"Error slicing array: {str(e)}")
-        return data
 
 def normalize_data(data):
     """將數據歸一化到[0, 1]範圍"""
@@ -428,8 +537,18 @@ def plot_data(data, plot_types, output_file=None, colormap='viridis', aspect=Non
         print("\nWarning: Data is not numeric. Cannot create plots.")
         return
     
-    # 清理數據以便繪圖
-    data_for_plot = np.copy(data)
+    # 處理 MaskedArray
+    is_masked = isinstance(data, np.ma.MaskedArray)
+    if is_masked:
+        masked_count = np.ma.count_masked(data)
+        print(f"\nNote: Data is a MaskedArray with {masked_count} masked values.")
+        # 對於繪圖，將遮罩值轉換為 NaN
+        data_for_plot = np.ma.filled(data, np.nan).astype(float)
+    else:
+        # 清理數據以便繪圖
+        data_for_plot = np.copy(data).astype(float)
+    
+    # 處理非有限值
     data_for_plot[~np.isfinite(data_for_plot)] = np.nan
     
     # 解析要生成的圖形類型
@@ -457,15 +576,19 @@ def plot_data(data, plot_types, output_file=None, colormap='viridis', aspect=Non
             # 繪製直方圖
             flat_data = data_for_plot.flatten()
             flat_data = flat_data[~np.isnan(flat_data)]  # 移除NaN
-            ax.hist(flat_data, bins=50, alpha=0.7, color='steelblue')
-            ax.set_title('Histogram')
-            ax.set_xlabel('Value')
-            ax.set_ylabel('Frequency')
-            ax.grid(True, alpha=0.3)
+            if len(flat_data) == 0:
+                ax.text(0.5, 0.5, 'No valid data for histogram', 
+                       ha='center', va='center', transform=ax.transAxes)
+                ax.set_title('Histogram (No Data)')
+            else:
+                ax.hist(flat_data, bins=50, alpha=0.7, color='steelblue')
+                ax.set_title('Histogram')
+                ax.set_xlabel('Value')
+                ax.set_ylabel('Frequency')
+                ax.grid(True, alpha=0.3)
         
         elif plot_type == 'heatmap':
             # 繪製熱圖
-            #print(aspect)
             if aspect == None :
                 aspect = 'auto'  # heatmap長寬比例
 
@@ -512,16 +635,39 @@ def plot_data(data, plot_types, output_file=None, colormap='viridis', aspect=Non
                 ax.set_title('Contour Plot (Not Available)')
             elif data.ndim == 2:
                 # 2D數組直接繪製
-                cs = ax.contourf(data_for_plot, cmap=colormap)
-                plt.colorbar(cs, ax=ax)
-                ax.set_title('Contour Plot')
+                # 檢查是否有足夠的有效數據
+                valid_mask = ~np.isnan(data_for_plot)
+                if np.sum(valid_mask) < 4:
+                    ax.text(0.5, 0.5, 'Insufficient valid data for contour plot',
+                           ha='center', va='center', transform=ax.transAxes)
+                    ax.set_title('Contour Plot (Insufficient Data)')
+                else:
+                    try:
+                        cs = ax.contourf(data_for_plot, cmap=colormap)
+                        plt.colorbar(cs, ax=ax)
+                        ax.set_title('Contour Plot')
+                    except Exception as e:
+                        ax.text(0.5, 0.5, f'Error creating contour plot:\n{str(e)}',
+                               ha='center', va='center', transform=ax.transAxes)
+                        ax.set_title('Contour Plot (Error)')
             else:
                 # 對於高維數組，取第一個2D切片
                 idx = tuple([0] * (data.ndim - 2))
                 data_2d = data_for_plot[idx]
-                cs = ax.contourf(data_2d, cmap=colormap)
-                plt.colorbar(cs, ax=ax)
-                ax.set_title(f'Contour Plot (first 2D slice: {idx})')
+                valid_mask = ~np.isnan(data_2d)
+                if np.sum(valid_mask) < 4:
+                    ax.text(0.5, 0.5, 'Insufficient valid data for contour plot',
+                           ha='center', va='center', transform=ax.transAxes)
+                    ax.set_title(f'Contour Plot (Insufficient Data, slice: {idx})')
+                else:
+                    try:
+                        cs = ax.contourf(data_2d, cmap=colormap)
+                        plt.colorbar(cs, ax=ax)
+                        ax.set_title(f'Contour Plot (first 2D slice: {idx})')
+                    except Exception as e:
+                        ax.text(0.5, 0.5, f'Error creating contour plot:\n{str(e)}',
+                               ha='center', va='center', transform=ax.transAxes)
+                        ax.set_title(f'Contour Plot (Error, slice: {idx})')
             
             ax.set_xlabel('X')
             ax.set_ylabel('Y')
@@ -537,7 +683,8 @@ def plot_data(data, plot_types, output_file=None, colormap='viridis', aspect=Non
     
     # 調整布局並設置標題
     plt.tight_layout()
-    fig.suptitle(f'Visualizations for Array (shape: {data.shape})', y=1.02)
+    title_suffix = f" (MaskedArray)" if is_masked else ""
+    fig.suptitle(f'Visualizations for Array (shape: {data.shape}){title_suffix}', y=1.02)
     
     # 保存或顯示圖形
     if output_file:
@@ -558,8 +705,11 @@ def main(args=None):
         print(f"# Run time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         print("="*50)
     
-    # 載入文件
-    data = load_file(args.input, args.type, args.variable, args.list_vars)
+    # 解析索引字串
+    index_slice = parse_index_string(args.index)
+    
+    # 載入文件（現在在載入時就應用索引切片）
+    data = load_file(args.input, args.type, args.variable, args.list_vars, index_slice)
     
     # 如果只是列出變數，直接返回
     if args.list_vars:
@@ -574,12 +724,8 @@ def main(args=None):
         print("No data loaded. Exiting.")
         return None
     
-    # 顯示數組信息
+    # 顯示數組信息（已經是切片後的數據）
     display_array_info(data, args.quiet)
-    
-    # 切片數組(如果指定了索引)
-    if args.index:
-        data = slice_array(data, args.index)
     
     # 顯示統計信息(如果請求)
     if args.stats:
