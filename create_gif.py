@@ -155,6 +155,11 @@ else:  # MP4 製作邏輯
             raise ValueError("沒有成功載入任何圖片檔案")
 
         fps = 1000 / duration
+
+        # 讓最後一張圖片多停留 (例如 1 張)
+        for _ in range(1):
+            temp_files.append(temp_files[-1])
+
         print(f"開始製作 MP4...")
         print(f"    總幀數: {len(temp_files)}")
         print(f"    幀率: {fps} fps")
