@@ -2,6 +2,7 @@
 #----------------------
 # create_gif_mp4.py
 #----------------------
+# v1.4 - CYC - 2025.09.25 - update: 修正 moviepy.editor 匯入問題
 # v1.3 - CYC - 2025.09.20 - update: 增加MP4輸出功能和幀率控制
 # v1.2 - CYC - 2025.07.05 - update: 增加圖片縮放功能
 # v1.1 - CYC - 2025.06.25 - update: 增加自選檔案參數
@@ -29,7 +30,13 @@ duration = args.duration
 # 檢查 MP4 輸出所需的套件
 if args.format == 'mp4':
     try:
-        from moviepy.editor import ImageSequenceClip
+        # 嘗試不同的匯入方式
+        try:
+            from moviepy.editor import ImageSequenceClip
+        except ImportError:
+            # 如果 editor 模組有問題，嘗試直接從子模組匯入
+            from moviepy.video.io.ImageSequenceClip import ImageSequenceClip
+            
     except ImportError:
         print("錯誤: 輸出 MP4 格式需要安裝 moviepy 套件")
         print("請執行: pip install moviepy")
