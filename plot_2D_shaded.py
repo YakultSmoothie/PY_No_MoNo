@@ -1,7 +1,7 @@
 #--------------------------------------------
 # 輸入一個np陣列快數看看結果
 #--------------------------------------------
-def plot_2D_shaded(array, levels=None, cmap='viridis', figsize=(5, 4),
+def plot_2D_shaded(array, levels=None, cmap='jet', figsize=(5, 4),
                   title=None, xlabel=None, ylabel=None,
                   colorbar=True, annotation=True, silent=False,
                   output_file=None, dpi=150, ax=None, fig=None):
@@ -13,6 +13,7 @@ def plot_2D_shaded(array, levels=None, cmap='viridis', figsize=(5, 4),
         array (numpy.ndarray/xarray.DataArray/pint.Quantity): 2D數組，支援多種格式
         ... (其他參數保持不變)
 
+    v1.2.1 2025-10-02 微調部分預設值
     v1.2 2025-10-01 微調輸出格示. 可傳入ax 與 fig
     v1.1 2025-09-18 支援xarray和pint單位自動轉換
     v1.0 2025-03-09 YakultSmoothie and Claude(CA)
@@ -189,6 +190,7 @@ def plot_2D_shaded(array, levels=None, cmap='viridis', figsize=(5, 4),
                verticalalignment='bottom',
                transform=ax.transAxes,
                fontsize=7, alpha=1.0,
+               zorder=90,
                bbox=dict(facecolor='white', alpha=0.8, edgecolor='gray', boxstyle='round,pad=0.5'))
     
     # 顯示網格線
