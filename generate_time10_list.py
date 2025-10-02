@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 """
-v 1.2 2025年9月13日
 把開始時間、結束時間、間隔時間（小時）輸入，
 然後輸出一串時間代碼
 支援兩種格式：
@@ -8,7 +7,8 @@ v 1.2 2025年9月13日
 - wrf: yyyy-mm-dd_hh:00:00
 create: 2025年9月3日 (v1.0)
 update: 2025年9月11日 (v1.1) - 增加自訂分隔符功能
-update: 2025年9月13日 (v1.2) - 增加 datetime 輸出格式
+update: 2025年9月13日 (v1.2) - 增加 datetime 輸出格式[format（輸出格式）參數]
+update: 2025年10月2日 (v1.3) - 增加 iso 格式輸出 (YYYY-MM-DDTHH)
 """
 #===============================================================================
 from datetime import datetime, timedelta
@@ -25,7 +25,7 @@ def generate_time_codes(start_time: str, end_time: str, interval: int, output_fo
     Returns:
         時間代碼列表
     """
-    
+
     start_dt = datetime.strptime(start_time, "%Y%m%d%H")
     end_dt = datetime.strptime(end_time, "%Y%m%d%H")
     times = []
@@ -64,16 +64,16 @@ def main():
         print("  generate_time_list.py 2025073001 2025073003 1 ',' iso")
         print("    -> 2025-07-30T01,2025-07-30T02,2025-07-30T03")
         sys.exit(1)
-    
+
     start_time = sys.argv[1]
     end_time = sys.argv[2]
     interval = int(sys.argv[3])
-    
+
     # 處理分隔符（第四個參數）
     if len(sys.argv) >= 5:
         separator = sys.argv[4]
         # 處理特殊字元
-        ## 使用n為換行 
+        ## 使用n為換行
         if separator == '\\n':
             separator = '\n'
         ## 使用t為tab
@@ -81,7 +81,7 @@ def main():
             separator = '\t'
     else:
         separator = ','
-    
+
     # 處理輸出格式(第五個參數)
     if len(sys.argv) >= 6:
         output_format = sys.argv[5].lower()
@@ -91,7 +91,7 @@ def main():
             sys.exit(1)
     else:
         output_format = 'time10'
-    
+
     try:
         result = generate_time_codes(start_time, end_time, interval, output_format)
         print(separator.join(result))
