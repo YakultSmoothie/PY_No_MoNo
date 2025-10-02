@@ -2,6 +2,7 @@
 #----------------------
 # create_gif_mp4.py
 #----------------------
+# v1.5 - CYC - 2025.10.02 - update: 修正MP4製作時圖片尺寸不一致問題
 # v1.4 - CYC - 2025.09.25 - update: 修正 moviepy.editor 匯入問題
 # v1.3 - CYC - 2025.09.20 - update: 增加MP4輸出功能和幀率控制
 # v1.2 - CYC - 2025.07.05 - update: 增加圖片縮放功能
@@ -21,7 +22,6 @@ parser.add_argument('-t', '--filetype', type=str, default='png', help='輸入的
 parser.add_argument('-f', '--files', type=str, nargs='+', help='指定要使用的圖像文件名稱')
 parser.add_argument('-s', '--size', type=float, default=1.0, help='圖片縮放比例, 0.5表示縮小到百分之五十')
 parser.add_argument('-fo', '--format', type=str, choices=['gif', 'mp4'], default='gif', help='輸出格式')
-# parser.add_argument('-fp', '--fps', type=int, default=5, help='MP4 影片的幀率, 預設為 5 fps')
 args = parser.parse_args()
 
 # 每一幀的持續時間
@@ -121,6 +121,42 @@ if args.format == 'gif':
     images[0].save(output_filename, save_all=True, append_images=images[1:], duration=duration, loop=0)
 
 else:  # MP4 製作邏輯
+    # 先掃描所有圖片,確定目標尺寸
+    print("掃描圖片尺寸...")
+    size_counts = {}
+    for file in image_files:
+        try:
+            img = Image.open(file)
+            if args.size != 1.0:
+                new_width = int(img.width * args.size)
+                new_height = int(img.height * args.size)
+            else:
+                new_width = img.width
+                new_height = img.height
+            
+            # 確保尺寸為偶數（H.264 編碼器要求）
+            new_width = new_width + (new_width % 2)
+            new_height = new_height + (new_height % 2)
+            
+            size = (new_width, new_height)
+            size_counts[size] = size_counts.get(size, 0) + 1
+        except Exception as e:
+            print(f"    警告: 無法讀取 {file}, 錯誤: {e}")
+    
+    if not size_counts:
+        raise ValueError("沒有成功讀取任何圖片檔案")
+    
+    # 找出最常見的尺寸作為目標尺寸
+    target_size = max(size_counts.items(), key=lambda x: x[1])[0]
+    print(f"目標統一尺寸: {target_size[0]}x{target_size[1]} (出現 {size_counts[target_size]} 次)")
+    
+    # 顯示其他尺寸的圖片數量
+    if len(size_counts) > 1:
+        print("其他尺寸的圖片將被調整為目標尺寸:")
+        for size, count in size_counts.items():
+            if size != target_size:
+                print(f"    {size[0]}x{size[1]}: {count} 張")
+    
     # 創建臨時目錄來存放調整後的圖片
     temp_dir = tempfile.mkdtemp()
     temp_files = []
@@ -135,12 +171,17 @@ else:  # MP4 製作邏輯
                     new_width = int(img.width * args.size)
                     new_height = int(img.height * args.size)
                     
-                    # 針對 MP4 格式，確保尺寸為偶數（H.264 編碼器要求）
-                    new_width = new_width + (new_width % 2)  # 如果是奇數就加1
-                    new_height = new_height + (new_height % 2)  # 如果是奇數就加1
+                    # 確保尺寸為偶數
+                    new_width = new_width + (new_width % 2)
+                    new_height = new_height + (new_height % 2)
                     
                     img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
                     print(f"    縮放到 {args.size*100}% ({new_width}x{new_height}): {file}")
+                
+                # 如果當前圖片尺寸與目標尺寸不同,調整為目標尺寸
+                if img.size != target_size:
+                    print(f"    調整尺寸 {img.size[0]}x{img.size[1]} -> {target_size[0]}x{target_size[1]}: {file}")
+                    img = img.resize(target_size, Image.Resampling.LANCZOS)
                 
                 # 保存到臨時目錄
                 temp_filename = os.path.join(temp_dir, f"frame_{i:05d}.png")
