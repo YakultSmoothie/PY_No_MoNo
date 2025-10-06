@@ -3,46 +3,52 @@
 #--------------------------------------------
 def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(5, 5),
                    o=None, title=None,
+
                    transform=None, projection=None,
-                   xlabel=None, ylabel=None, indent=0, 
-                   coastline=('yellow', 'black'), coastline_width=(1.5, 1.0), coastline_resolution='50m',
+                   xlabel=None, ylabel=None, indent=0,
+
+                   coastline=('yellow', 'black'), coastline_width=(1.7, 1.5), coastline_resolution='50m',
                    grid=True, grid_type=None, grid_int=None,
+
                    colorbar=True, annotation=True, silent=False,
-                   dpi=150, ax=None, fig=None, show=False, 
-                   vx=None, vy=None, vc1='black', vc2='lightblue', 
+                   dpi=150, ax=None, fig=None, show=False,
+
+                   vx=None, vy=None, vc1='black', vc2='lightblue',
                    vwidth=6, vlinewidth=0.4, vscale=None, vskip=None,
                    vref=None, vunit=None, vkey_offset=(0.0, 0.0),
-                   cnt=None, ccolor='magenta' , clevels=None, 
+
+                   cnt=None, ccolor='magenta' , clevels=None,
                    cwidth=(0.8, 1.8), ctype=('-', '-'), cntype=('--', '--'), clab=(False, True)
-                   ):                
+
+                   ):
     '''
     快速將NumPy陣列繪製成2D圖像進行可視化分析，支援向量場疊加
 
     參數:
     === 基本數據參數 ===
-        array (numpy.ndarray/xarray.DataArray/pint.Quantity): 
+        array (numpy.ndarray/xarray.DataArray/pint.Quantity):
             2D數組，支援多種格式
         x (array-like): 經度座標
         y (array-like): 緯度座標
         levels (list): 等值線/色階的值，如果為None則自動產生. 例如：np.linspace(-20, 20, 11)
-        
+
     === 圖形樣式參數 ===
         cmap (str): 使用的色彩映射名稱，預設'viridis'. ex: turbo, jet, RdBu_r, seismic, BrBG
         figsize (tuple): 圖形尺寸，預設(5, 5)
         colorbar (bool): 是否顯示色條，預設True
         annotation (bool): 是否顯示統計數據註釋，預設True
-        
+
     === 標註與軸參數 ===
         title (str): 圖形標題
         xlabel (str): x軸標籤
         ylabel (str): y軸標籤
-        
+
     === 投影與座標系統 ===
         transform: 地圖投影轉換（例如：ccrs.PlateCarree()）
         projection: 地圖投影方式
                wrf的投影方式可以透過以下方式取得
                    ncfile = nc.Dataset(f"/path/wrfinput_d02")
-                   hgt = wrf.getvar(ncfile, "HGT") 
+                   hgt = wrf.getvar(ncfile, "HGT")
                    proj = wrf.get_cartopy(hgt)
 
     === 地圖特徵參數 ===
@@ -52,18 +58,18 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
         grid (bool): 是否顯示網格線，預設True
         grid_type: 投影法對應的網格
         grid_int: 網格int
-        
+
     === 輸出控制參數 ===
         o (str): 輸出檔案路徑，如果為None則不保存
         dpi (int): 圖像解析度，預設150
         silent (bool): 是否抑制統計資訊的終端輸出，預設False
         indent (int): 終端輸出縮排空格數，預設0
-        
+
     === 圖形物件參數 ===
         ax: matplotlib axes物件，若為None則自動創建
         fig: matplotlib figure物件，若為None則自動創建
         show: run fig.show()? ，預設False
-        
+
     === 向量場參數 ===
         vx (array-like): 向量x分量
         vy (array-like): 向量y分量
@@ -78,7 +84,7 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
         vunit (str): 向量單位標註，若為None則自動從數據中提取
         vkey_offset (tuple): quiverkey位置偏移量，預設(0.0, 0.0)
             實際位置為(1.05+offset[0], 1.03+offset[1])
-    
+
     === 等值線參數 ===
         cnt (array-like): 等值線變數，2D陣列
         ccolor (str): 等值線顏色，預設'orange'
@@ -113,26 +119,26 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
     import cartopy.crs as ccrs
     import cartopy.feature as cfeature
     from matplotlib.ticker import MaxNLocator
-    import matplotlib.ticker as mticker     
-    import cartopy.mpl.ticker as cticker    
+    import matplotlib.ticker as mticker
+    import cartopy.mpl.ticker as cticker
 
     plt.rcParams['font.sans-serif'] = ['DejaVu Sans', 'Arial', 'sans-serif']
     plt.rcParams['axes.unicode_minus'] = False
     #print(f"Current font: {matplotlib.rcParams['font.sans-serif']}")
     #print(f"Unicode minus: {matplotlib.rcParams['axes.unicode_minus']}")
-    
+
     # 建立縮排字串
     ind = ' ' * indent
     ind2 = ' ' * (indent + 4)  # 第二層縮排固定多4格
-    
+
     print(f"\n{ind}{'-'*50}")
     print(f"{ind}plot_2D_shaded run... ...")
-    
+
     # 自動處理不同類型的輸入數據
     original_array = array
     unit_str = "unknown"
     has_units = False
-    
+
     # 先檢查並保存單位資訊（在提取數據之前）
     # 檢查 xarray.DataArray.data 是否為 pint Quantity
     if hasattr(array, 'data') and hasattr(array.data, 'units'):
@@ -152,11 +158,11 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
             print(f"{ind}檢測到shaded xarray DataArray, 自動提取.data")
 
     #breakpoint()
-    
+
     # 處理xarray DataArray
     if hasattr(array, 'data'):
         array = array.data
-    
+
     # 處理pint Quantity (帶單位的數據)
     if hasattr(array, 'magnitude'):
         if not has_units:  # 如果之前沒有提取到單位，這裡再檢查一次
@@ -164,13 +170,13 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
             if not silent:
                 print(f"{ind}提取pint Quantity的magnitude")
         array = array.magnitude
-    
+
     # 處理pandas DataFrame/Series
     if hasattr(array, 'values'):
         if not silent:
             print(f"{ind}檢測到pandas物件, 自動提取.values")
         array = array.values
-    
+
     # 確保最終結果是numpy陣列
     if not isinstance(array, np.ndarray):
         try:
@@ -179,10 +185,10 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
                 print(f"{ind}已將輸入轉換為numpy陣列")
         except:
             raise TypeError(f"無法將輸入轉換為NumPy陣列, 輸入類型: {type(original_array)}")
-    
+
     if array.ndim != 2:
         raise ValueError(f"輸入必須是2D陣列, 目前維度為{array.ndim}")
-    
+
     # 獲取數組維度
     rows, cols = array.shape
     if not silent:
@@ -190,11 +196,11 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
         print(f"{ind2}title: {title}")
         print(f"{ind2}2D陣列分析報告")
         print(f"{ind2}陣列形狀: {array.shape}")
-    
+
     # 計算基本統計資訊
     data_valid = array[~np.isnan(array)]
     stats = {}
-    
+
     if len(data_valid) > 0:
         stats['min'] = data_min = np.nanmin(array)
         stats['max'] = data_max = np.nanmax(array)
@@ -204,7 +210,7 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
         stats['q1'] = q1 = np.nanquantile(array, 0.25)
         stats['q2'] = q2 = np.nanquantile(array, 0.50)  # 中位數
         stats['q3'] = q3 = np.nanquantile(array, 0.75)
-        
+
         # 在終端輸出統計資訊
         if not silent:
             print(f"{ind2}統計摘要:")
@@ -217,17 +223,17 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
         if not silent:
             print(f"{ind2}!! 統計摘要: 無有效數據(全部為NaN) !!")
             raise ValueError("plot_2D_shaded stop")
-    
+
     # 增加統計NaN值數量
     stats['nan_count'] = nan_count = np.count_nonzero(np.isnan(array))
     stats['nan_percent'] = nan_percent = nan_count / (rows * cols) * 100
     stats['valid_count'] = valid_count = rows * cols - nan_count
     stats['valid_percent'] = valid_percent = 100 - nan_percent
-    
+
     if not silent:
         print(f"{ind2}NaN值分析:")
         print(f"{ind2}    NaN值數量:    {nan_count} / {rows * cols} ({nan_percent:.2f}%)")
-    
+
     # 自動生成color等值線範圍(如果沒有提供)
     if levels is None:
         if len(data_valid) > 0:
@@ -236,7 +242,7 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
             levels = MaxNLocator(nbins=n_bins+40).tick_values(np.percentile(data_valid, 5), np.percentile(data_valid, 95))
         else:
             levels = np.linspace(data_min, data_max, 11)  # 默認範圍
-    
+
     # 設置colormap, 讓NaN值顯示為黑色
     if not silent:
         print(f"{ind2}繪圖設定:")
@@ -268,15 +274,15 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
 
     # 創建圖形
     #background_color = 'gray'
-    #if ax is None:        
+    #if ax is None:
     #    fig, ax = plt.subplots(figsize=figsize)
     #    ax.set_facecolor(background_color)
     #else:
     #    if fig is None:
     #        fig = ax.get_figure()
-    #    ax.set_facecolor(background_color)  
-      
-    
+    #    ax.set_facecolor(background_color)
+
+
     print(f"{ind2}創建網格數據:")
     # 創建網格數據
     if x is None and y is None:
@@ -294,11 +300,11 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
             if not silent:
                 print(f"{ind2}    檢測到y為xarray DataArray, 自動提取.values")
             y = y.values
-        
+
         # 檢查經緯度維度
         x_array = np.array(x)
         y_array = np.array(y)
-        
+
         if x_array.ndim == 2 and y_array.ndim == 2:
             # 兩者都是二維陣列
             XX = x_array
@@ -310,7 +316,7 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
             raise ValueError(f"{ind2}    x和y的維度必須相同且為1D或2D。當前x維度: {x_array.ndim}, y維度: {y_array.ndim}")
     else:
         raise ValueError(f"{ind2}    x和y必須同時提供或同時為None")
-    
+
     # 繪製等值線填充圖
     print(f"{ind2}繪製色彩等值線圖:")
     masked_array = np.ma.masked_invalid(array)
@@ -322,20 +328,20 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
                          )
     else:
         cf = ax.contourf(XX, YY, array, levels=levels, cmap=cmap_obj, extend='both', zorder=0)
-    
+
     # 加粗框
     for spine in ax.spines.values():
         spine.set_linewidth(2.7)
         spine.set_zorder(99)
-    
-    # 添加標題和軸標籤    
+
+    # 添加標題和軸標籤
     if title:
         ax.set_title(title, fontsize=10, pad=5, fontweight='bold')
     if xlabel:
         ax.set_xlabel(xlabel, fontsize=10)
     if ylabel:
         ax.set_ylabel(ylabel, fontsize=10)
-    
+
     # 添加色條
     if colorbar:
         cbar = plt.colorbar(cf, ax=ax,
@@ -347,7 +353,7 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
                     location='right'  # colorbar 的位置（Matplotlib >= 3.6 支援）
                     )
         cbar.ax.tick_params(labelsize=10)
-    
+
     # 添加統計信息在圖的左下角
     ng = 3
     if annotation and not np.isnan(stats.get('mean', np.nan)):
@@ -362,37 +368,37 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
                fontsize=7, alpha=1.0,
                zorder=90,
                bbox=dict(facecolor='white', alpha=0.8, edgecolor='gray', boxstyle='round,pad=0.5'))
-        
-    # ============ 參考線繪製 ============  
+
+    # ============ 參考線繪製 ============
     # 添加海岸線（如果有投影）
     if transform is not None and coastline is not None:
-        print(f"{ind2}draw coastline: color: {coastline}, width: {coastline_width}")   
+        print(f"{ind2}draw coastline: color: {coastline}, width: {coastline_width}")
         ax.coastlines(coastline_resolution, linewidth=coastline_width[0], color=coastline[0],
                       zorder=4, alpha=0.8)
         ax.coastlines(coastline_resolution, linewidth=coastline_width[1], color=coastline[1],
                       zorder=5, alpha=0.8)
-    
+
     #print(type(transform).__name__)
     #print(grid_type)
     #print(locals().keys())
     #breakpoint()
     # 顯示網格線
-    print(f"{ind2}draw grid:")   
+    print(f"{ind2}draw grid:")
     if grid:
         grid_int = {'10m': (1, 1), '50m': (10, 10), '110m': (30, 30)}.get(coastline_resolution, (10, 10))
         xlocs = np.arange(-180, 361, grid_int[0])
         ylocs = np.arange(-90, 91, grid_int[1])
         print(f"{ind2}    grid interval: {grid_int[0]}° (lon) × {grid_int[1]}° (lat)")
-        
+
         if (grid_type == None and type(projection).__name__ == 'LambertConformal') or (grid_type == 2) or (grid_type == 'Lambert'):
             print(f"{ind2}    grid type: gridlines with labels (for LambertConformal)")
             # 設定經緯度網格線 - for ccrs.LambertConformal
             gl = ax.gridlines(
                 draw_labels={'bottom': 'x', 'left': 'y'},  # 明確指定標籤位置
-                linewidth=1.0,
+                linewidth=1.5,
                 color='gray',
                 alpha=0.6,
-                linestyle='--',
+                linestyle=':',
                 zorder=9,
                 x_inline=False,  # 不要內嵌標籤
                 y_inline=False,
@@ -402,31 +408,31 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
             gl.xlocator = mticker.FixedLocator(xlocs)    # 明確指定經度
             gl.ylocator = mticker.FixedLocator(ylocs)    # 明確指定緯度
             gl.xformatter = cticker.LongitudeFormatter()
-            gl.yformatter = cticker.LatitudeFormatter()   
+            gl.yformatter = cticker.LatitudeFormatter()
             ## 標籤樣式
             gl.xlabel_style = {'size': 10, 'color': 'black', 'rotation': 0}  # 明確設定 rotation=0
             gl.ylabel_style = {'size': 10, 'color': 'black'}
 
         elif (grid_type == None) or (grid_type == 1):
             print(f"{ind2}    grid type: basic grid (ax.grid)")
-            ax.grid(True, linestyle='--', alpha=0.6, zorder=9)    
+            ax.grid(True, linestyle=':', alpha=0.6, zorder=9, linewidth=1.5)
 
-        else:    
+        else:
             print(f"{ind2}    grid type do not find")
-            
-    else:        
+
+    else:
         print(f"{ind2}    grid disabled")
-    
+
     # ============ 向量場繪製 ============
     if vx is not None and vy is not None:
         if not silent:
             print(f"{ind2}向量場繪製:")
-        
+
         # 處理向量數據（支援xarray和pint）
         vx_data = vx
         vy_data = vy
         vector_unit = "unknown"
-        
+
         # 提取vx單位和數據
         if hasattr(vx, 'data') and hasattr(vx.data, 'units'):
             vector_unit = f"{vx.data.units:~}"
@@ -440,7 +446,7 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
             vx_data = vx.data
         elif hasattr(vx, 'values'):
             vx_data = vx.values
-        
+
         # 提取vy數據
         if hasattr(vy, 'data') and hasattr(vy.data, 'magnitude'):
             vy_data = vy.data.magnitude
@@ -450,21 +456,21 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
             vy_data = vy.data
         elif hasattr(vy, 'values'):
             vy_data = vy.values
-        
+
         # 如果有明確指定單位，使用指定的單位
         if vunit is not None:
             if not silent:
                 print(f"{ind2}    使用輸入的單位: {vunit}")
             vector_unit = vunit
-        
+
         # 確保為numpy陣列
         vx_data = np.array(vx_data)
         vy_data = np.array(vy_data)
-        
+
         # 計算風速統計
         wind_speed = np.sqrt(vx_data**2 + vy_data**2)
         wind_speed_valid = wind_speed[~np.isnan(wind_speed)]
-        
+
         if len(wind_speed_valid) > 0:
             stats['vector_min'] = vec_min = np.nanmin(wind_speed)
             stats['vector_max'] = vec_max = np.nanmax(wind_speed)
@@ -473,7 +479,7 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
             stats['vector_q1'] = vec_q1 = np.nanquantile(wind_speed, 0.25)
             stats['vector_q2'] = vec_q2 = np.nanquantile(wind_speed, 0.50)
             stats['vector_q3'] = vec_q3 = np.nanquantile(wind_speed, 0.75)
-            
+
             if not silent:
                 print(f"{ind2}    向量場統計 (風速):")
                 print(f"{ind2}        mean, std:    {vec_mean:.6g}, {vec_std:.6g}")
@@ -483,13 +489,13 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
                 vec_nan_count = np.count_nonzero(np.isnan(wind_speed))
                 vec_nan_percent = vec_nan_count / wind_speed.size * 100
                 print(f"{ind2}        NaN值數量:    {vec_nan_count} / {wind_speed.size} ({vec_nan_percent:.2f}%)")
-            
+
             # 自動設定scale（如果沒有提供）
             if vscale is None:
                 vscale = vec_max * 4
                 if not silent:
                     print(f"{ind2}    自動設定vscale: {vscale:.3g}")
-            
+
             # 自動設定參考長度（如果沒有提供）
             if vref is None:
                 vref = float(f"{vec_max:.2g}")  # 取兩位有效數字
@@ -502,7 +508,7 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
             stats['vector_std'] = stats['vector_q1'] = stats['vector_q2'] = stats['vector_q3'] = np.nan
             vscale = 100  # 預設值
             vref = 1  # 預設值
-        
+
         # 決定向量跳點方式
         if vskip is None:
             if transform is not None:
@@ -531,10 +537,10 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
                     print(f"{ind2}    使用regrid_shape: {vskip}")
                 else:
                     print(f"{ind2}    使用陣列切片跳點: {vskip}")
-        
+
         # 轉換vwidth（自動除以1000）
         vwidth_actual = vwidth / 1000
-        
+
         # 繪製向量場
         if use_regrid:
             qu = ax.quiver(XX, YY, vx_data, vy_data,
@@ -544,13 +550,13 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
                           transform=transform, regrid_shape=vskip, zorder=20)
         else:
             # 使用切片方式
-            qu = ax.quiver(XX[::vskip[1], ::vskip[0]], YY[::vskip[1], ::vskip[0]], 
+            qu = ax.quiver(XX[::vskip[1], ::vskip[0]], YY[::vskip[1], ::vskip[0]],
                           vx_data[::vskip[1], ::vskip[0]], vy_data[::vskip[1], ::vskip[0]],
                           color=vc1, width=vwidth_actual,
                           edgecolor=vc2, linewidth=vlinewidth,
                           scale=vscale, scale_units='inches',
                           zorder=20)
-        
+
         # 添加quiverkey，位置為(1.05, 1.03) + offset
         qk_x = 1.05 + vkey_offset[0]
         qk_y = 1.03 + vkey_offset[1]
@@ -558,14 +564,14 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
             color_quiverkey = 'black'
         else:
             color_quiverkey = vc1
-        qk = ax.quiverkey(qu, qk_x, qk_y, vref, 
+        qk = ax.quiverkey(qu, qk_x, qk_y, vref,
                          f'{vref:.2g} [{vector_unit}]',
-                         labelpos='N', coordinates='axes', 
+                         labelpos='N', coordinates='axes',
                          color=color_quiverkey, labelcolor=color_quiverkey,
                          fontproperties={'size': 10}, zorder=99)
-    else:        
-        print(f"{ind2}    grid disabled")
-  
+    else:
+        print(f"{ind2}    vector disabled")
+
     # ============ 等值線繪製 ============
     if cnt is not None:
         if not silent:
@@ -636,7 +642,7 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
 
             # 去除交集，保留粗線的levels
             clevels1_filtered = np.setdiff1d(clevels1, clevels2)
-            
+
             if not silent:
                 print(f"{ind2}    去除交集後細線levels: {clevels1_filtered}")
                 print(f"{ind2}    等值線顏色: {ccolor}")
@@ -662,7 +668,7 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
                     for label in labels1:
                         label.set_fontweight(500)  # 微粗體
                         label.set_fontsize(10)
-            
+
             # 繪製粗線等值線
             if len(clevels2) > 0:
                 lstyles2 = [ctype[1] if lev >= 0 else cntype[1] for lev in clevels2]  # 建立linestyles列表 - 根據level正負值決定線型
@@ -687,22 +693,22 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
 
         else:
             if not silent:
-                print(f"{ind2}等值線繪製:")
-        
+                print(f"{ind2} cnt disable")
+
     # ============ After Draw ============
     if show:
         fig.tight_layout()
         fig.show()  # 只在show=True時顯示
 
     # 保存圖像
-    if o:        
+    if o:
         fig.tight_layout()
         fig.savefig(o, dpi=dpi, bbox_inches='tight')
         if not silent:
             print(f"{ind2}圖像已保存至: {o}")
-    
+
     if not silent:
         print(f"{ind}{'-'*50}")
-    
+
     # 返回圖形對象和統計資訊
     return fig, ax, stats
