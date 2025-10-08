@@ -16,11 +16,13 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
                    vx=None, vy=None, vc1='black', vc2='lightblue', 
                    vwidth=6, vlinewidth=0.4, vscale=None, vskip=None,
                    vref=None, vunit=None, vkey_offset=(0.00, 0.00),
+                   vx_bai=None, vy_bai=None, vkey_labelpos='N',  # 新增：quiverkey標籤位置參數
+                   color_quiverkey=None,
+                   #vkey_edgecolor=None,  
 
                    cnt=None, ccolor='magenta', clevels=None, cints=None,
                    cwidth=(0.8, 2.0), ctype=('-', '-'), cntype=('--', '--'), clab=(False, True)
-
-                   ):                
+                   ):
     '''
     快速將NumPy陣列繪製成2D圖像進行可視化分析，支援向量場疊加
 
@@ -69,12 +71,16 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
         ax: matplotlib axes物件，若為None則自動創建
         fig: matplotlib figure物件，若為None則自動創建
         show: run fig.show()? ，預設False
-        
+       
     === 向量場參數 ===
         vx (array-like): 向量x分量
         vy (array-like): 向量y分量
-        vc1 (str): 向量主體顏色，預設'green'
-        vc2 (str): 向量邊界顏色，預設'white'
+        vx_bai (float): vx的縮放倍率，預設None（不縮放）
+        vy_bai (float): vy的縮放倍率，預設None（不縮放）
+        vkey_labelpos (str): quiverkey標籤位置，預設'N', 可選: 'N', 'S', 'E', 'W'
+        color_quiverkey (str): color of quiverkey, 預設None
+        vc1 (str): 向量主體顏色，預設'black'
+        vc2 (str): 向量邊界顏色，預設'lightblue'
         vwidth (float): 向量寬度，預設6（程式內自動除以1000）
         vlinewidth (float): 向量邊界線寬，預設0.4
         vscale (float): 向量縮放比例，若為None則自動設為max_wind_speed*4
@@ -96,6 +102,11 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
         cntype (tuple): (<0細線樣式, <0粗線樣式)，預設('--', '--')
         clab (tuple): 是否標示數值 (細線, 粗線)，預設(False, True)
 
+    v1.7 2025-10-08 增加向量場倍率縮放功能
+                    新增vx_bai, vy_bai參數：支援水平/垂直分量分別縮放
+                    新增vkey_labelpos參數：可調整quiverkey標籤位置(N/S/E/W)
+                    改善quiverkey標籤：倍率資訊自動標註並支援換行顯示
+                    改善單位顯示：向量場單位資訊輸出更完整    
     v1.6 2025-10-07 增加等值線cints選項 - 規則間隔的等值線
     v1.5 2025-10-06 增加等值線繪製功能
                     增加地圖特徵參數功能
@@ -452,6 +463,8 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
         # 提取vy數據
         if hasattr(vy, 'data') and hasattr(vy.data, 'magnitude'):
             vy_data = vy.data.magnitude
+            if not silent:
+                print(f"{ind2}    檢測到vy為xarray DataArray with pint, 單位: {vy.data.units:~}")
         elif hasattr(vy, 'magnitude'):
             vy_data = vy.magnitude
         elif hasattr(vy, 'data'):
@@ -464,6 +477,10 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
             if not silent:
                 print(f"{ind2}    使用輸入的單位: {vunit}")
             vector_unit = vunit
+        else:
+            if not silent:
+                print(f"{ind2}    使用單位: {vector_unit}")    
+        
         
         # 確保為numpy陣列
         vx_data = np.array(vx_data)
@@ -483,7 +500,7 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
             stats['vector_q3'] = vec_q3 = np.nanquantile(wind_speed, 0.75)
             
             if not silent:
-                print(f"{ind2}    向量場統計 (風速):")
+                print(f"{ind2}    向量場統計:")
                 print(f"{ind2}        mean, std:    {vec_mean:.6g}, {vec_std:.6g}")
                 print(f"{ind2}        min, max:     {vec_min:.6g}, {vec_max:.6g}")
                 print(f"{ind2}        Q1, Q2, Q3:   {vec_q1:.6g}, {vec_q2:.6g}, {vec_q3:.6g}")
@@ -540,9 +557,21 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
                 else:
                     print(f"{ind2}    使用陣列切片跳點: {vskip}")
         
+        # 1.7新增：應用倍率縮放 ===================
+        if vx_bai is not None:
+            vx_data = vx_data * vx_bai
+            if not silent:
+                print(f"{ind2}    vx已乘以倍率: {vx_bai}")
+        
+        if vy_bai is not None:
+            vy_data = vy_data * vy_bai
+            if not silent:
+                print(f"{ind2}    vy已乘以倍率: {vy_bai}")
+        # 1.7新增：應用倍率縮放 ===================
+        
         # 轉換vwidth（自動除以1000）
         vwidth_actual = vwidth / 1000
-        
+
         # 繪製向量場
         if use_regrid:
             qu = ax.quiver(XX, YY, vx_data, vy_data,
@@ -562,15 +591,29 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
         # 添加quiverkey，位置為(1.05, 1.03) + offset
         qk_x = 1.05 + vkey_offset[0]
         qk_y = 1.03 + vkey_offset[1]
-        if vc1 == 'white':
-            color_quiverkey = 'black'
+      
+        # 根據倍率情況決定quiverkey的文字標籤
+        if vx_bai is None and vy_bai is None:
+            label_text = f'{vref:.2g} [{vector_unit}]'
+        elif vx_bai is not None and vy_bai is None:
+            label_text = f'{vref:.2g} [{vector_unit}]\n(horizontal ×{vx_bai})'
+        elif vx_bai is None and vy_bai is not None:
+            label_text = f'{vref:.2g} [{vector_unit}]\n(vertical ×{vy_bai})'
         else:
+            label_text = f'{vref:.2g} [{vector_unit}]\n(h ×{vx_bai}, v ×{vy_bai})'
+        
+        # auto labelcolor
+        if color_quiverkey is None:
             color_quiverkey = vc1
-        qk = ax.quiverkey(qu, qk_x, qk_y, vref, 
-                         f'{vref:.2g} [{vector_unit}]',
-                         labelpos='N', coordinates='axes', 
+            if color_quiverkey == 'white' or color_quiverkey == '#FFFFFF':
+                color_quiverkey = 'black'       
+        
+        # 繪製主體quiverkey
+        qk = ax.quiverkey(qu, qk_x, qk_y, vref, label_text,
+                         labelpos=vkey_labelpos, coordinates='axes', 
                          color=color_quiverkey, labelcolor=color_quiverkey,
                          fontproperties={'size': 10}, zorder=99)
+
     else:        
         print(f"{ind2}    vector disabled")
   
