@@ -1,12 +1,13 @@
-def array_info(data, var_name="Variable", indent=0):
+def array_info(data, var_name="Variable", indent=0, lite=False):
     """
     顯示陣列的詳細資訊 
-    v1.3 - 2025/10/01 - YakultSmoothie
+
     
     參數:
         data: 輸入資料（支援 xarray.DataArray, numpy.array, numpy.ma.MaskedArray, pint.Quantity)
         var_name: 變數名稱（用於顯示標題）
         indent: 縮排空格數（預設為0）
+        lite: 簡化輸出（預設為False）
     
     輸出資訊包括:
         - 資料型別
@@ -15,6 +16,9 @@ def array_info(data, var_name="Variable", indent=0):
         - NaN/遮罩比例
         - 單位資訊（如有）
         - 座標資訊(xarray專用)
+
+    v1.4 - 2025/10/09 - YakultSmoothie
+    v1.3 - 2025/10/01 - YakultSmoothie
     """
     import numpy as np
     import xarray as xr
@@ -71,61 +75,84 @@ def array_info(data, var_name="Variable", indent=0):
     data_ndim = data.ndim if hasattr(data, 'ndim') else values.ndim
     data_size = data.size if hasattr(data, 'size') else values.size
     print(f"{ind}data shape, ndim, size: {data_shape}, {data_ndim}, {data_size}")
-    
+
     # 如果是 xarray.DataArray，顯示維度名稱與座標資訊
     if isinstance(data, xr.DataArray):
         print(f"{ind}維度名稱: {data.dims}")
         print(f"{ind}座標軸:")
         for dim in data.dims:
-            coord_values = data[dim].values
+            # 確保該維度在座標中存在
+            if dim not in data.coords:
+                print(f"{ind2}{dim}: 無座標資訊")
+                continue
+                
+            coord_values = data.coords[dim].values
+            
+            # 處理多維座標的情況（例如 2D 座標）
+            if coord_values.ndim > 1:
+                print(f"{ind2}{dim}: 多維座標 shape={coord_values.shape}")
+                continue
+            
+            # 取得第一個和最後一個值
+            first_val_raw = coord_values[0]
+            last_val_raw = coord_values[-1]
+            
+            # 如果是 0-d array，轉換成純量
+            if isinstance(first_val_raw, np.ndarray) and first_val_raw.ndim == 0:
+                first_val_raw = first_val_raw.item()
+            if isinstance(last_val_raw, np.ndarray) and last_val_raw.ndim == 0:
+                last_val_raw = last_val_raw.item()
             
             # 判斷座標值的型別並選擇適當的格式
             if np.issubdtype(coord_values.dtype, np.number):
                 # 數值型別:使用科學記號格式
-                first_val = f"{coord_values[0]:.4g}"
-                last_val = f"{coord_values[-1]:.4g}"
+                first_val = f"{first_val_raw:.4g}"
+                last_val = f"{last_val_raw:.4g}"
             elif np.issubdtype(coord_values.dtype, np.datetime64):
                 # 日期時間型別
-                first_val = str(coord_values[0])
-                last_val = str(coord_values[-1])
+                first_val = str(first_val_raw)
+                last_val = str(last_val_raw)
             else:
                 # 其他型別(字串等):直接轉字串
-                first_val = str(coord_values[0])
-                last_val = str(coord_values[-1])
-            
+                first_val = str(first_val_raw)
+                last_val = str(last_val_raw)
+                
             print(f"{ind2}{dim}: 範圍 [{first_val} to {last_val}], 長度 {len(coord_values)}")
+
     
     # 處理遮罩陣列
-    if isinstance(values, np.ma.MaskedArray):
-        valid_data = values.compressed()
-        mask_ratio = values.mask.sum() / values.size * 100
-        print(f"{ind}遮罩資訊:")
-        print(f"{ind2}total size: {values.size}")
-        print(f"{ind2}有效資料點數: {valid_data.size}")
-        print(f"{ind2}遮罩比例: {mask_ratio:.2f}%")
-    else:
-        valid_data = values[~np.isnan(values)]
-        nan_count = np.isnan(values).sum()
-        nan_ratio = nan_count / values.size * 100
-        print(f"{ind}NaN資訊:")
-        print(f"{ind2}total size: {values.size}")
-        print(f"{ind2}NaN數量: {nan_count}")
-        print(f"{ind2}NaN比例: {nan_ratio:.2f}%")
-    
+    if lite == False:
+        if isinstance(values, np.ma.MaskedArray):
+            valid_data = values.compressed()
+            mask_ratio = values.mask.sum() / values.size * 100
+            print(f"{ind}遮罩資訊:")
+            print(f"{ind2}total size: {values.size}")
+            print(f"{ind2}有效資料點數: {valid_data.size}")
+            print(f"{ind2}遮罩比例: {mask_ratio:.2f}%")
+        else:
+            valid_data = values[~np.isnan(values)]
+            nan_count = np.isnan(values).sum()
+            nan_ratio = nan_count / values.size * 100
+            print(f"{ind}NaN資訊:")
+            print(f"{ind2}total size: {values.size}")
+            print(f"{ind2}NaN數量: {nan_count}")
+            print(f"{ind2}NaN比例: {nan_ratio:.2f}%")
+        
     # 統計量（僅對有效資料計算）
-    if valid_data.size > 0:
-        print(f"{ind}統計量 ({unit_str}):")
-        print(f"{ind2}Range: from {np.nanmin(valid_data):.6g} to {np.nanmax(valid_data):.6g}")
-        print(f"{ind2}Mean, Std: {np.nanmean(valid_data):.6g}, {np.nanstd(valid_data):.6g}")
-        
-        percentiles = np.nanpercentile(valid_data, [25, 75])
-        print(f"{ind2}Q1, Q2, Q3: {percentiles[0]:.6g}, {np.nanmedian(valid_data):.6g}, {percentiles[1]:.6g}")
-        
-        inf_count = np.isinf(valid_data).sum()
-        if inf_count > 0:
-            print(f"{ind}警告: 發現 {inf_count} 個無限值")
-    else:
-        print(f"{ind}警告: 沒有有效資料可進行統計")
+    if lite == False:
+        if valid_data.size > 0:
+            print(f"{ind}統計量 ({unit_str}):")
+            print(f"{ind2}Range: from {np.nanmin(valid_data):.6g} to {np.nanmax(valid_data):.6g}")
+            print(f"{ind2}Mean, Std: {np.nanmean(valid_data):.6g}, {np.nanstd(valid_data):.6g}")
+            
+            percentiles = np.nanpercentile(valid_data, [25, 75])
+            print(f"{ind2}Q1, Q2, Q3: {percentiles[0]:.6g}, {np.nanmedian(valid_data):.6g}, {percentiles[1]:.6g}")
+            
+            inf_count = np.isinf(valid_data).sum()
+            if inf_count > 0:
+                print(f"{ind}警告: 發現 {inf_count} 個無限值")
+        else:
+            print(f"{ind}警告: 沒有有效資料可進行統計")
     
     # 資料型別資訊
     print(f"{ind}資料型別 (dtype): {values.dtype}")
