@@ -8,7 +8,8 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
                    xlabel=None, ylabel=None, indent=0, 
 
                    coastline=('yellow', 'black'), coastline_width=(1.7, 1.5), coastline_resolution='50m',
-                   grid=True, grid_type=None, grid_int=None,
+                   grid=True, grid_type=None, grid_int=None, grid_linestyle=':', grid_linewidth=1.5,
+
 
                    colorbar=True, annotation=True, silent=False,
                    dpi=150, ax=None, fig=None, show=False, 
@@ -21,7 +22,9 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
                    #vkey_edgecolor=None,  
 
                    cnt=None, ccolor='magenta', clevels=None, cints=None,
-                   cwidth=(0.8, 2.0), ctype=('-', '-'), cntype=('--', '--'), clab=(False, True)
+                   cwidth=(0.8, 2.0), ctype=('-', '-'), cntype=('--', '--'), clab=(False, True),
+
+                   invert_xaxis=False, invert_yaxis=False
                    ):
     '''
     快速將NumPy陣列繪製成2D圖像進行可視化分析，支援向量場疊加
@@ -60,6 +63,8 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
         grid (bool): 是否顯示網格線，預設True
         grid_type: 投影法對應的網格
         grid_int: 網格int
+        grid_linestyle (str):  ，預設':'
+        grid_linewidth: ，預設 1.5
         
     === 輸出控制參數 ===
         o (str): 輸出檔案路徑，如果為None則不保存
@@ -96,12 +101,13 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
         ccolor (str): 等值線顏色，預設'orange'
         clevels (tuple): (細線levels, 粗線levels)，若為None則自動生成
             預設每4條細線畫一次粗線
-        cints (tuple): 當使用者只提供間隔(cints)而非完整levels時，自動計算等值線levels，預設None
+        cints (tuple): 當使用者只提供間隔[ex:cints=(5, 20)]而非完整levels時，自動計算等值線levels，預設None
         cwidth (tuple): (細線寬度, 粗線寬度)，預設(0.8, 2.0)
         ctype (tuple): (細線樣式, 粗線樣式)，預設('-', '-')
         cntype (tuple): (<0細線樣式, <0粗線樣式)，預設('--', '--')
         clab (tuple): 是否標示數值 (細線, 粗線)，預設(False, True)
-
+    
+    v1.7.1 2025-10-09 增加功能invert_xaxis=False, invert_yaxis=False功能
     v1.7 2025-10-08 增加向量場倍率縮放功能
                     新增vx_bai, vy_bai參數：支援水平/垂直分量分別縮放
                     新增vkey_labelpos參數：可調整quiverkey標籤位置(N/S/E/W)
@@ -334,7 +340,12 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
     print(f"{ind2}繪製色彩等值線圖:")
     masked_array = np.ma.masked_invalid(array)
     cmap_obj = colormaps.get_cmap(cmap)
+    if len(levels) <= 15:
+        print(f"{ind2}    contourf levels: {levels}")
+    else:
+        print(f"{ind2}    total contourf levels: {len(levels)}, from {np.min(levels)} to {np.max(levels)}")
     #print(transform)
+
     if transform is not None:
         cf = ax.contourf(XX, YY, array, levels=levels, cmap=cmap_obj, extend='both', zorder=0,
                          transform=transform
@@ -408,10 +419,10 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
             # 設定經緯度網格線 - for ccrs.LambertConformal
             gl = ax.gridlines(
                 draw_labels={'bottom': 'x', 'left': 'y'},  # 明確指定標籤位置
-                linewidth=1.5,
+                linewidth=grid_linewidth,
                 color='gray',
                 alpha=0.6,
-                linestyle=':',
+                linestyle=grid_linestyle,
                 zorder=9,
                 x_inline=False,  # 不要內嵌標籤
                 y_inline=False,
@@ -428,8 +439,8 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
 
         elif (grid_type == None) or (grid_type == 1):
             print(f"{ind2}    grid type: basic grid (ax.grid)")
-            ax.grid(True, linestyle=':', alpha=0.6, zorder=9, linewidth=1.5)    
-
+            ax.grid(True, linestyle=grid_linestyle, alpha=0.6, zorder=9, linewidth=grid_linewidth) 
+            
         else:    
             print(f"{ind2}    grid type do not find")
             
@@ -437,10 +448,9 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
         print(f"{ind2}    grid disabled")
     
     # ============ 向量場繪製 ============
-    if vx is not None and vy is not None:
-        if not silent:
-            print(f"{ind2}向量場繪製:")
-        
+    if not silent:
+        print(f"{ind2}向量場繪製:")
+    if vx is not None and vy is not None:       
         # 處理向量數據（支援xarray和pint）
         vx_data = vx
         vy_data = vy
@@ -615,13 +625,12 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
                          fontproperties={'size': 10}, zorder=99)
 
     else:        
-        print(f"{ind2}    vector disabled")
+        print(f"{ind2}vector disabled")
   
     # ============ 等值線繪製 ============
+    if not silent:
+        print(f"{ind2}等值線繪製:")
     if cnt is not None:
-        if not silent:
-            print(f"{ind2}等值線繪製:")
-
         # 處理等值線數據（支援xarray和pint）
         cnt_data = cnt
         cnt_unit = "unknown"
@@ -753,6 +762,14 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
             if not silent:
                 print(f"{ind2} cnt disable")
         
+    # ============ set invert_xaxis, invert_yaxis ============
+    if invert_xaxis == True:
+        # 讓 x 軸反轉
+        ax.invert_xaxis()
+    if invert_yaxis == True:
+        # 讓 y 軸反轉
+        ax.invert_yaxis()
+    
     # ============ After Draw ============
     if show:
         fig.tight_layout()
