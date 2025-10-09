@@ -27,7 +27,7 @@ def array_info(data, var_name="Variable", indent=0, lite=False):
     ind = ' ' * indent
     ind2 = ' ' * (indent + 4)  # 第二層縮排固定多4格
     
-    print(f"\n{ind}{'-'*60}")
+    print(f"{ind}{'-'*60}")
     print(f"{ind}--- array_info: {var_name} ---")
     print(f"{ind}{'-'*60}")
     
