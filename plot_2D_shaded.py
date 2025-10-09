@@ -10,16 +10,14 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
                    coastline=('yellow', 'black'), coastline_width=(1.7, 1.5), coastline_resolution='50m',
                    grid=True, grid_type=None, grid_int=None, grid_linestyle=':', grid_linewidth=1.5,
 
-
                    colorbar=True, annotation=True, silent=False,
                    dpi=150, ax=None, fig=None, show=False, 
 
                    vx=None, vy=None, vc1='black', vc2='lightblue', 
                    vwidth=6, vlinewidth=0.4, vscale=None, vskip=None,
                    vref=None, vunit=None, vkey_offset=(0.00, 0.00),
-                   vx_bai=None, vy_bai=None, vkey_labelpos='N',  # 新增：quiverkey標籤位置參數
+                   vx_bai=None, vy_bai=None, vkey_labelpos='N',
                    color_quiverkey=None,
-                   #vkey_edgecolor=None,  
 
                    cnt=None, ccolor='magenta', clevels=None, cints=None,
                    cwidth=(0.8, 2.0), ctype=('-', '-'), cntype=('--', '--'), clab=(False, True),
@@ -27,7 +25,7 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
                    invert_xaxis=False, invert_yaxis=False
                    ):
     '''
-    快速將NumPy陣列繪製成2D圖像進行可視化分析，支援向量場疊加
+    快速將NumPy陣列繪製成2D圖像進行可視化分析，支援向量場疊加與多組等值線
 
     參數:
     === 基本數據參數 ===
@@ -35,78 +33,147 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
             2D數組，支援多種格式
         x (array-like): 經度座標
         y (array-like): 緯度座標
-        levels (list): 等值線/色階的值，如果為None則自動產生. 例如：np.linspace(-20, 20, 11)
+        figsize (tuple): 圖形尺寸(寬, 高)，預設(5, 5)
         
     === 圖形樣式參數 ===
-        cmap (str): 使用的色彩映射名稱，預設'viridis'. ex: turbo, jet, RdBu_r, seismic, BrBG
-        figsize (tuple): 圖形尺寸，預設(5, 5)
+        levels (list): 等值線/色階的值，如果為None則自動產生
+            例如：np.linspace(-20, 20, 11)
+        cmap (str): 使用的色彩映射名稱，預設'viridis'
+            常用選項：turbo, jet, RdBu_r, seismic, BrBG
         colorbar (bool): 是否顯示色條，預設True
-        annotation (bool): 是否顯示統計數據註釋，預設True
+        annotation (bool): 是否顯示統計數據註釋(panel的左下角)，預設True
         
     === 標註與軸參數 ===
         title (str): 圖形標題
         xlabel (str): x軸標籤
         ylabel (str): y軸標籤
+        indent (int): 終端輸出縮排空格數，預設0
         
     === 投影與座標系統 ===
         transform: 地圖投影轉換（例如：ccrs.PlateCarree()）
+            用於將數據座標轉換到地圖投影座標
         projection: 地圖投影方式
-               wrf的投影方式可以透過以下方式取得
-                   ncfile = nc.Dataset(f"/path/wrfinput_d02")
-                   hgt = wrf.getvar(ncfile, "HGT") 
-                   proj = wrf.get_cartopy(hgt)
+            wrf的投影方式可以透過以下方式取得：
+                ncfile = nc.Dataset(f"/path/wrfinput_d02")
+                hgt = wrf.getvar(ncfile, "HGT") 
+                proj = wrf.get_cartopy(hgt)
 
     === 地圖特徵參數 ===
-        coastline (tuple): 海岸線顏色(外層, 內層)，預設('yellow', 'black')
+        coastline (tuple or None): 海岸線顏色(外層, 內層)，預設('yellow', 'black')
+            - tuple: (外層顏色, 內層顏色)，繪製雙層海岸線增強可見度
+            - None: 不繪製海岸線
+            - 外層通常使用亮色(如'yellow')作為邊框，內層使用深色(如'black')作為主體
+            例如：('white', 'black'), ('yellow', 'blue')        
         coastline_width (tuple): 海岸線寬度(外層, 內層)，預設(1.7, 1.5)
-        coastline_resolution (str): 海岸線解析度，預設'50m'（可選'10m', '50m', '110m'）
-        grid (bool): 是否顯示網格線，預設True
-        grid_type: 投影法對應的網格
-        grid_int: 網格int
-        grid_linestyle (str):  ，預設':'
-        grid_linewidth: ，預設 1.5
+            - (外層線寬, 內層線寬)，外層應略粗於內層
+            例如：(2.0, 1.5), (1.5, 1.0)        
+        coastline_resolution (str): 海岸線解析度，預設'50m'
+            - '10m': 高解析度，適合區域地圖
+            - '50m': 中解析度，適合一般用途
+            - '110m': 低解析度，適合全球地圖        
+        grid (bool): 是否顯示網格線，預設True        
+        grid_type (int or str or None): 網格線繪製類型，預設None（自動判斷）
+            - None: 根據投影類型自動選擇
+                * LambertConformal投影 → 使用類型2
+                * 其他投影 → 使用類型1
+            - 1 或 'basic': 使用基本網格線(ax.grid)
+                * 適用於PlateCarree等簡單投影
+                * 繪製簡單的格線，不帶經緯度標籤
+            - 2 或 'Lambert': 使用帶標籤的gridlines
+                * 適用於LambertConformal投影
+                * 自動在圖邊緣標註經緯度
+                * 支援經緯線定位與格式化        
+        grid_int (tuple or None): 網格線間隔(經度間隔, 緯度間隔)，預設None（自動設定）
+            - None: 根據coastline_resolution自動設定
+                * '10m'  → (1°, 1°)
+                * '50m'  → (10°, 10°)
+                * '110m' → (30°, 30°)
+            - tuple: 手動指定經緯度間隔，例如：(5, 5), (2, 2)        
+        grid_linestyle (str): 網格線樣式，預設':'（點線）
+            常用選項：'-'（實線）, '--'（虛線）, '-.'（點虛線）, ':'（點線）        
+        grid_linewidth (float): 網格線寬度，預設1.5
         
     === 輸出控制參數 ===
         o (str): 輸出檔案路徑，如果為None則不保存
         dpi (int): 圖像解析度，預設150
         silent (bool): 是否抑制統計資訊的終端輸出，預設False
-        indent (int): 終端輸出縮排空格數，預設0
         
     === 圖形物件參數 ===
         ax: matplotlib axes物件，若為None則自動創建
         fig: matplotlib figure物件，若為None則自動創建
-        show: run fig.show()? ，預設False
+        show (bool): 是否執行fig.show()顯示圖形，預設False
        
     === 向量場參數 ===
-        vx (array-like): 向量x分量
-        vy (array-like): 向量y分量
+        vx (array-like): 向量x分量（水平分量）
+        vy (array-like): 向量y分量（垂直分量）        
         vx_bai (float): vx的縮放倍率，預設None（不縮放）
+            用於放大或縮小水平風分量以便觀察        
         vy_bai (float): vy的縮放倍率，預設None（不縮放）
-        vkey_labelpos (str): quiverkey標籤位置，預設'N', 可選: 'N', 'S', 'E', 'W'
-        color_quiverkey (str): color of quiverkey, 預設None
+            用於放大或縮小垂直風分量以便觀察        
+        vkey_labelpos (str): quiverkey標籤位置，預設'N'
+            - 'N': 標籤在參考箭頭北側（上方）
+            - 'S': 標籤在參考箭頭南側（下方）
+            - 'E': 標籤在參考箭頭東側（右方）
+            - 'W': 標籤在參考箭頭西側（左方）        
+        color_quiverkey (str): quiverkey的顏色，預設None（自動設定）
+            - None: 自動使用vc1的顏色（若vc1為白色則改用黑色）
+            - str: 手動指定顏色，例如：'red', 'blue', '#FF0000'        
         vc1 (str): 向量主體顏色，預設'black'
-        vc2 (str): 向量邊界顏色，預設'lightblue'
-        vwidth (float): 向量寬度，預設6（程式內自動除以1000）
-        vlinewidth (float): 向量邊界線寬，預設0.4
+        vc2 (str): 向量邊界顏色，預設'lightblue'        
+        vwidth (float): 向量寬度，預設6
+            注意：程式內自動除以1000，實際寬度為0.006        
+        vlinewidth (float): 向量邊界線寬，預設0.4        
         vscale (float): 向量縮放比例，若為None則自動設為max_wind_speed*4
+            數值越大，箭頭越短        
         vskip (tuple): 向量跳點設定(skip_x, skip_y)
-            若為None則自動根據網格尺寸決定（目標保留約20個向量）
-        vref (float): quiverkey參考長度，若為None則自動設為max_wind_speed（取2位有效數字）
-        vunit (str): 向量單位標註，若為None則自動從數據中提取
-        vkey_offset (tuple): quiverkey位置偏移量，預設(0.0, 0.0)
+            - None: 自動根據網格尺寸決定（目標保留約20個向量）
+            - tuple: 手動指定跳點，例如：(20, 20)表示每20個格點取一個
+            注意：有投影時使用regrid_shape，無投影時使用陣列切片        
+        vref (float): quiverkey參考長度，若為None則自動設為max_wind_speed（取2位有效數字）        
+        vunit (str): 向量單位標註，若為None則自動從數據中提取        
+        vkey_offset (tuple): quiverkey位置偏移量(x_offset, y_offset)用於微調參考箭頭的顯示位置，預設(0.0, 0.0)
             實際位置為(1.05+offset[0], 1.03+offset[1])
-    
+                
     === 等值線參數 ===
-        cnt (array-like): 等值線變數，2D陣列
-        ccolor (str): 等值線顏色，預設'orange'
-        clevels (tuple): (細線levels, 粗線levels)，若為None則自動生成
-            預設每4條細線畫一次粗線
-        cints (tuple): 當使用者只提供間隔[ex:cints=(5, 20)]而非完整levels時，自動計算等值線levels，預設None
-        cwidth (tuple): (細線寬度, 粗線寬度)，預設(0.8, 2.0)
-        ctype (tuple): (細線樣式, 粗線樣式)，預設('-', '-')
-        cntype (tuple): (<0細線樣式, <0粗線樣式)，預設('--', '--')
-        clab (tuple): 是否標示數值 (細線, 粗線)，預設(False, True)
+        cnt (array-like or list of array-like): 等值線變數
+            - 單一2D陣列：繪製一組等值線
+            - list of 2D陣列：繪製多組等值線
+            例如：[pressure, height, vorticity]        
+        ccolor (str or list of str): 等值線顏色，預設'magenta'
+            - 單一顏色：所有等值線使用相同顏色
+            - list of str：為每組等值線指定不同顏色
+            例如：['magenta', 'blue', 'green']        
+        clevels (tuple or list of tuple): (細線levels, 粗線levels)，若為None則自動生成
+            - None: 自動生成，預設每4條細線畫一次粗線
+            - tuple: 單組等值線的levels設定
+            - list of tuple: 多組等值線各自的levels設定
+            例如：([990, 992, 994, ...], [992, 1000, 1008, ...])        
+        cints (tuple or list of tuple): (細線間隔, 粗線間隔)，預設None
+            當使用者只提供間隔而非完整levels時，自動計算等值線levels
+            - tuple: 單組等值線的間隔，例如：(5, 20)表示細線每5畫一條，粗線每20畫一條
+            - list of tuple: 多組等值線各自的間隔
+            注意：cints和clevels只需提供其中一個        
+        cwidth (tuple or list of tuple): (細線寬度, 粗線寬度)，預設(0.8, 2.0)
+            - tuple: 單組等值線的線寬
+            - list of tuple: 多組等值線各自的線寬        
+        ctype (tuple or list of tuple): (細線樣式, 粗線樣式)，預設('-', '-')
+            線樣式選項：'-'（實線）, '--'（虛線）, '-.'（點虛線）, ':'（點線）
+            此參數用於>=0的等值線        
+        cntype (tuple or list of tuple): (<0細線樣式, <0粗線樣式)，預設('--', '--')
+            此參數用於<0的等值線（負值等值線）
+        clab (tuple or list of tuple): 是否標示數值(細線, 粗線)，預設(False, True) 只在粗線上標註數值
+            - (True, True): 細線和粗線都標註數值
+            - (False, False): 都不標註
     
+    === 軸向控制參數 ===
+        invert_xaxis (bool): 是否反轉x軸，預設False
+            True時x軸數值由大到小排列
+        invert_yaxis (bool): 是否反轉y軸，預設False
+            True時y軸數值由大到小排列（常用於氣壓座標）
+
+    v1.8 2025-10-09 增加多組等值線繪製功能
+                    支援cnt輸入為list，可同時繪製多組等值線
+                    所有等值線相關參數都支援list輸入
     v1.7.1 2025-10-09 增加功能invert_xaxis=False, invert_yaxis=False功能
     v1.7 2025-10-08 增加向量場倍率縮放功能
                     新增vx_bai, vy_bai參數：支援水平/垂直分量分別縮放
@@ -128,8 +195,12 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
     返回:
         matplotlib.figure.Figure: 產生的Figure物件
         matplotlib.axes.Axes: 產生的Axes物件
-        dict: 包含所有統計資訊的字典（包含向量統計）
+        dict: 包含所有統計資訊的字典（包含向量統計與多組等值線統計）
+        numpy.ndarray: XX - 網格經度座標
+        numpy.ndarray: YY - 網格緯度座標
     '''
+
+
     import numpy as np
     import matplotlib.pyplot as plt
     from matplotlib import colormaps
@@ -360,7 +431,7 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
     
     # 添加標題和軸標籤    
     if title:
-        ax.set_title(title, fontsize=10, pad=5, fontweight='bold')
+        ax.set_title(title, fontsize=10, pad=9, fontweight='bold')
     if xlabel:
         ax.set_xlabel(xlabel, fontsize=10)
     if ylabel:
@@ -626,142 +697,204 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
 
     else:        
         print(f"{ind2}vector disabled")
-  
+
     # ============ 等值線繪製 ============
     if not silent:
         print(f"{ind2}等值線繪製:")
+    
     if cnt is not None:
-        # 處理等值線數據（支援xarray和pint）
-        cnt_data = cnt
-        cnt_unit = "unknown"
-
-        # 提取cnt單位和數據
-        if hasattr(cnt, 'data') and hasattr(cnt.data, 'units'):
-            cnt_unit = f"{cnt.data.units:~}"
-            cnt_data = cnt.data.magnitude
-            if not silent:
-                print(f"{ind2}    檢測到cnt為xarray DataArray with pint, 單位: {cnt_unit}")
-        elif hasattr(cnt, 'units') and hasattr(cnt, 'magnitude'):
-            cnt_unit = f"{cnt.units:~}"
-            cnt_data = cnt.magnitude
-        elif hasattr(cnt, 'data'):
-            cnt_data = cnt.data
-        elif hasattr(cnt, 'values'):
-            cnt_data = cnt.values
-
-        # 確保為numpy陣列
-        cnt_data = np.array(cnt_data)
-
-        # 計算等值線統計
-        cnt_valid = cnt_data[~np.isnan(cnt_data)]
-
-        if len(cnt_valid) > 0:
-            stats['contour_min'] = cnt_min = np.nanmin(cnt_data)
-            stats['contour_max'] = cnt_max = np.nanmax(cnt_data)
-            stats['contour_mean'] = cnt_mean = np.nanmean(cnt_data)
-            stats['contour_std'] = cnt_std = np.nanstd(cnt_data)
-            stats['contour_q1'] = cnt_q1 = np.nanquantile(cnt_data, 0.25)
-            stats['contour_q2'] = cnt_q2 = np.nanquantile(cnt_data, 0.50)
-            stats['contour_q3'] = cnt_q3 = np.nanquantile(cnt_data, 0.75)
-
-            if not silent:
-                print(f"{ind2}    等值線統計:")
-                print(f"{ind2}        mean, std:    {cnt_mean:.6g}, {cnt_std:.6g}")
-                print(f"{ind2}        min, max:     {cnt_min:.6g}, {cnt_max:.6g}")
-                print(f"{ind2}        Q1, Q2, Q3:   {cnt_q1:.6g}, {cnt_q2:.6g}, {cnt_q3:.6g}")
-                # 計算NaN比例
-                cnt_nan_count = np.count_nonzero(np.isnan(cnt_data))
-                cnt_nan_percent = cnt_nan_count / cnt_data.size * 100
-                print(f"{ind2}        NaN值數量:    {cnt_nan_count} / {cnt_data.size} ({cnt_nan_percent:.2f}%)")
-
-            # 自動設定clevels（如果沒有提供）
-            if clevels is None and cints is None:
-                # 使用Sturges公式計算適當的等級數
-                n_bins = int(np.ceil(np.log2(len(cnt_valid)) + 1))
-                all_levels = MaxNLocator(nbins=n_bins).tick_values(np.max(cnt_valid)-1, np.min(cnt_valid)+1)
-                # 細線：所有levels
-                clevels1 = all_levels
-                # 粗線：每4條取一條
-                clevels2 = all_levels[::4]
-
-            elif clevels is None and cints is not None:
-                # 當使用者只提供間隔(cints)而非完整levels時，自動計算等值線levels
-                # 計算細線等值線的上下界
-                # cmaxs[0]: 找到 >= cnt最大值 且為 cints[0] 的倍數的最小數值（向上取整到間隔倍數，再加1確保涵蓋）
-                # cmins[0]: 找到 <= cnt最小值 且為 cints[0] 的倍數的最大數值（向下取整到間隔倍數）
-                cmaxs = np.ceil(np.max(cnt_valid) / cints) * cints + 1  
-                cmins = np.floor(np.min(cnt_valid) / cints) * cints  
-                # 根據計算出的上下界和間隔，生成細線等值線levels
-                # 例如：若 cmins[0]=990, cmaxs[0]=1025, cints[0]=2
-                #      則 clevels1 = [990, 992, 994, ..., 1024]
-                clevels1 = np.arange(cmins[0], cmaxs[0], cints[0])
-                clevels2 = np.arange(cmins[1], cmaxs[1], cints[1])
-                if not silent:
-                    print(f"{ind2}    等值線int: {cints}")
-                           
-            else:
-                clevels1, clevels2 = clevels
-               
-            if not silent:
-                    print(f"{ind2}    clevels:")
-                    print(f"{ind2}        clevels1: {clevels1}  (共 {len(clevels1)} 條)")
-                    print(f"{ind2}        clevels1: {clevels2}  (共 {len(clevels2)} 條)")
-
-            # 去除交集，保留粗線的levels
-            clevels1_filtered = np.setdiff1d(clevels1, clevels2)
-            
-            if not silent:                
-                print(f"{ind2}        去除交集後細線clevels1: {clevels1_filtered}  (共 {len(clevels1_filtered)} 條)")
-                print(f"{ind2}    等值線顏色: {ccolor}")
-                print(f"{ind2}    線寬: {cwidth}")
-                print(f"{ind2}    線型: {ctype}")
-                print(f"{ind2}    <0線型: {cntype}")
-
-            # 繪製細線等值線
-            if len(clevels1_filtered) > 0:
-                lstyles1 = [ctype[0] if lev >= 0 else cntype[0] for lev in clevels1_filtered]  # 建立linestyles列表 - 根據level正負值決定線型
-
-                if transform is not None:
-                    contours1 = ax.contour(XX, YY, cnt_data, levels=clevels1_filtered, colors=ccolor,
-                                          linewidths=cwidth[0], linestyles=lstyles1, transform=transform, zorder=30)
-                else:
-                    contours1 = ax.contour(XX, YY, cnt_data, levels=clevels1_filtered, colors=ccolor,
-                                          linewidths=cwidth[0], linestyles=lstyles1, zorder=30)
-                # 添加標籤（細線）
-                if clab[0]:
-                    labels1 = ax.clabel(contours1, inline=True, fontsize=10,
-                                        fmt=lambda x: f'{x:g}' if x >= 0 else f'–{abs(x):g}',
-                                        inline_spacing=1, zorder=35)
-                    for label in labels1:
-                        label.set_fontweight(500)  # 微粗體
-                        label.set_fontsize(10)
-            
-            # 繪製粗線等值線
-            if len(clevels2) > 0:
-                lstyles2 = [ctype[1] if lev >= 0 else cntype[1] for lev in clevels2]  # 建立linestyles列表 - 根據level正負值決定線型
-                if transform is not None:
-                    contours2 = ax.contour(XX, YY, cnt_data, levels=clevels2, colors=ccolor,
-                                          linewidths=cwidth[1], linestyles=lstyles2, transform=transform, zorder=31)
-                else:
-                    contours2 = ax.contour(XX, YY, cnt_data, levels=clevels2, colors=ccolor,
-                                          linewidths=cwidth[1], linestyles=lstyles2, zorder=31)
-                # 添加標籤（粗線）
-                if clab[1]:
-                    labels2 = ax.clabel(contours2, inline=True, fontsize=10,
-                                        fmt=lambda x: f'{x:g}' if x >= 0 else f'–{abs(x):g}',
-                                        inline_spacing=1, zorder=35)
-                    for label in labels2:
-                        label.set_fontweight(500)  # 微粗體
-                        label.set_fontsize(10)
-
-            # 儲存等值線levels到stats
-            stats['contour_levels1'] = clevels1_filtered
-            stats['contour_levels2'] = clevels2
-
+        # 判斷cnt是單一陣列還是列表
+        if isinstance(cnt, (list, tuple)):
+            cnt_list = cnt
+            n_contours = len(cnt_list)
+            print(f"{ind2}    檢測到多組等值線，共 {n_contours} 組")
         else:
-            if not silent:
-                print(f"{ind2} cnt disable")
+            cnt_list = [cnt]
+            n_contours = 1
+            print(f"{ind2}    檢測到單組等值線")
         
+        # 處理各等值線參數，統一轉換為列表格式
+        def _make_list(param, n, param_name):
+            """將參數統一轉換為列表格式"""
+            if param is None:
+                return [None] * n
+            elif isinstance(param, (list, tuple)) and n > 1:
+                if len(param) != n:
+                    print(f"{ind2}    警告: {param_name}的長度({len(param)})與cnt數量({n})不符，使用第一個值")
+                    return [param[0]] * n
+                return list(param)
+            else:
+                return [param] * n
+        
+        # 轉換所有等值線相關參數
+        ccolor_list = _make_list(ccolor, n_contours, 'ccolor')
+        clevels_list = _make_list(clevels, n_contours, 'clevels')
+        cints_list = _make_list(cints, n_contours, 'cints')
+        cwidth_list = _make_list(cwidth, n_contours, 'cwidth')
+        ctype_list = _make_list(ctype, n_contours, 'ctype')
+        cntype_list = _make_list(cntype, n_contours, 'cntype')
+        clab_list = _make_list(clab, n_contours, 'clab')
+        
+        # 初始化統計資訊字典
+        stats['contour_stats'] = []
+        
+        # 迴圈繪製每組等值線
+        for i_cnt in range(n_contours):
+            print(f"{ind2}    === 繪製第 {i_cnt+1}/{n_contours} 組等值線 ===")
+            
+            cnt_current = cnt_list[i_cnt]
+            ccolor_current = ccolor_list[i_cnt]
+            clevels_current = clevels_list[i_cnt]
+            cints_current = cints_list[i_cnt]
+            cwidth_current = cwidth_list[i_cnt]
+            ctype_current = ctype_list[i_cnt]
+            cntype_current = cntype_list[i_cnt]
+            clab_current = clab_list[i_cnt]
+            
+            # 處理等值線數據（支援xarray和pint）
+            cnt_data = cnt_current
+            cnt_unit = "unknown"
+
+            # 提取cnt單位和數據
+            if hasattr(cnt_current, 'data') and hasattr(cnt_current.data, 'units'):
+                cnt_unit = f"{cnt_current.data.units:~}"
+                cnt_data = cnt_current.data.magnitude
+                if not silent:
+                    print(f"{ind2}        檢測到xarray with pint，單位: {cnt_unit}")
+            elif hasattr(cnt_current, 'units') and hasattr(cnt_current, 'magnitude'):
+                cnt_unit = f"{cnt_current.units:~}"
+                cnt_data = cnt_current.magnitude
+            elif hasattr(cnt_current, 'data'):
+                cnt_data = cnt_current.data
+            elif hasattr(cnt_current, 'values'):
+                cnt_data = cnt_current.values
+
+            # 確保為numpy陣列
+            cnt_data = np.array(cnt_data)
+
+            # 計算等值線統計
+            cnt_valid = cnt_data[~np.isnan(cnt_data)]
+
+            contour_stat = {'index': i_cnt}
+            
+            if len(cnt_valid) > 0:
+                contour_stat['min'] = cnt_min = np.nanmin(cnt_data)
+                contour_stat['max'] = cnt_max = np.nanmax(cnt_data)
+                contour_stat['mean'] = cnt_mean = np.nanmean(cnt_data)
+                contour_stat['std'] = cnt_std = np.nanstd(cnt_data)
+                contour_stat['q1'] = cnt_q1 = np.nanquantile(cnt_data, 0.25)
+                contour_stat['q2'] = cnt_q2 = np.nanquantile(cnt_data, 0.50)
+                contour_stat['q3'] = cnt_q3 = np.nanquantile(cnt_data, 0.75)
+                contour_stat['unit'] = cnt_unit
+
+                if not silent:
+                    print(f"{ind2}        統計:")
+                    print(f"{ind2}            mean, std:    {cnt_mean:.6g}, {cnt_std:.6g}")
+                    print(f"{ind2}            min, max:     {cnt_min:.6g}, {cnt_max:.6g}")
+                    print(f"{ind2}            Q1, Q2, Q3:   {cnt_q1:.6g}, {cnt_q2:.6g}, {cnt_q3:.6g}")
+                    # 計算NaN比例
+                    cnt_nan_count = np.count_nonzero(np.isnan(cnt_data))
+                    cnt_nan_percent = cnt_nan_count / cnt_data.size * 100
+                    print(f"{ind2}            NaN:          {cnt_nan_count}/{cnt_data.size} ({cnt_nan_percent:.2f}%)")
+
+                # 自動設定clevels（如果沒有提供）
+                if clevels_current is None and cints_current is None:
+                    n_bins = int(np.ceil(np.log2(len(cnt_valid)) + 1))
+                    all_levels = MaxNLocator(nbins=n_bins).tick_values(
+                        np.max(cnt_valid)-1, np.min(cnt_valid)+1)
+                    clevels1 = all_levels
+                    clevels2 = all_levels[::4]
+
+                elif clevels_current is None and cints_current is not None:
+                    cmaxs = np.ceil(np.max(cnt_valid) / np.array(cints_current)) * np.array(cints_current) + 1  
+                    cmins = np.floor(np.min(cnt_valid) / np.array(cints_current)) * np.array(cints_current)  
+                    clevels1 = np.arange(cmins[0], cmaxs[0], cints_current[0])
+                    clevels2 = np.arange(cmins[1], cmaxs[1], cints_current[1])
+                    if not silent:
+                        print(f"{ind2}        等值線間隔: {cints_current}")
+                else:
+                    clevels1, clevels2 = clevels_current
+               
+                if not silent:
+                    print(f"{ind2}        clevels:")
+                    print(f"{ind2}            細線: {clevels1}  (共{len(clevels1)}條)")
+                    print(f"{ind2}            粗線: {clevels2}  (共{len(clevels2)}條)")
+
+                # 去除交集
+                clevels1_filtered = np.setdiff1d(clevels1, clevels2)
+                
+                if not silent:                
+                    print(f"{ind2}            去交集後細線: {clevels1_filtered}  (共{len(clevels1_filtered)}條)")
+                    print(f"{ind2}        顏色: {ccolor_current}")
+                    print(f"{ind2}        線寬: {cwidth_current}")
+                    print(f"{ind2}       +線型: {ctype_current}")
+                    print(f"{ind2}       -線型: {cntype_current}")
+
+                # 計算zorder基礎值（每組等值線間隔1）
+                zorder_base = 70 + i_cnt * 1
+                
+                # 繪製細線等值線
+                if len(clevels1_filtered) > 0:
+                    lstyles1 = [ctype_current[0] if lev >= 0 else cntype_current[0] 
+                               for lev in clevels1_filtered]
+
+                    if transform is not None:
+                        contours1 = ax.contour(XX, YY, cnt_data, levels=clevels1_filtered, 
+                                              colors=ccolor_current, linewidths=cwidth_current[0], 
+                                              linestyles=lstyles1, transform=transform, 
+                                              zorder=zorder_base)
+                    else:
+                        contours1 = ax.contour(XX, YY, cnt_data, levels=clevels1_filtered, 
+                                              colors=ccolor_current, linewidths=cwidth_current[0], 
+                                              linestyles=lstyles1, zorder=zorder_base)
+                    
+                    if clab_current[0]:
+                        labels1 = ax.clabel(contours1, inline=True, fontsize=10,
+                                           fmt=lambda x: f'{x:g}' if x >= 0 else f'–{abs(x):g}',
+                                           inline_spacing=1, zorder=zorder_base+1)
+                        for label in labels1:
+                            label.set_fontweight(500)
+                            label.set_fontsize(10)
+                
+                # 繪製粗線等值線
+                if len(clevels2) > 0:
+                    lstyles2 = [ctype_current[1] if lev >= 0 else cntype_current[1] 
+                               for lev in clevels2]
+                    
+                    if transform is not None:
+                        contours2 = ax.contour(XX, YY, cnt_data, levels=clevels2, 
+                                              colors=ccolor_current, linewidths=cwidth_current[1], 
+                                              linestyles=lstyles2, transform=transform, 
+                                              zorder=zorder_base)
+                    else:
+                        contours2 = ax.contour(XX, YY, cnt_data, levels=clevels2, 
+                                              colors=ccolor_current, linewidths=cwidth_current[1], 
+                                              linestyles=lstyles2, zorder=zorder_base)
+                    
+                    if clab_current[1]:
+                        labels2 = ax.clabel(contours2, inline=True, fontsize=10,
+                                           fmt=lambda x: f'{x:g}' if x >= 0 else f'–{abs(x):g}',
+                                           inline_spacing=1, zorder=zorder_base+1)
+                        for label in labels2:
+                            label.set_fontweight(500)
+                            label.set_fontsize(10)
+
+                # 儲存等值線levels到統計資訊
+                contour_stat['levels_thin'] = clevels1_filtered
+                contour_stat['levels_thick'] = clevels2
+                contour_stat['color'] = ccolor_current
+
+            else:
+                if not silent:
+                    print(f"{ind2}        無有效數據")
+                contour_stat['valid'] = False
+            
+            stats['contour_stats'].append(contour_stat)
+        
+        print(f"{ind2}    === 完成所有等值線繪製 ===")
+    else:        
+        print(f"{ind2}    等值線功能未啟用")
+
     # ============ set invert_xaxis, invert_yaxis ============
     if invert_xaxis == True:
         # 讓 x 軸反轉
