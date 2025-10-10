@@ -1,17 +1,21 @@
 #--------------------------------------------
 # 視覺化一個輸入陣列
 #--------------------------------------------
-def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(5, 5),
-                   o=None, title=None, title_loc='left',
+def plot_2D_shaded(array, x=None, y=None, 
+                   levels=None, cmap='viridis', colorbar_ticks=None,
+
+                   figsize=(5, 5), o=None, title=None, title_loc='left',
                    
-                   transform=None, projection=None,
+                   projection=None, transform=None, 
                    xlabel=None, ylabel=None, indent=0, 
 
-                   coastline=('yellow', 'black'), coastline_width=(1.7, 1.5), coastline_resolution='50m',
+                   coastline_color=('yellow', 'black'), coastline_width=(1.7, 1.5), coastline_resolution='50m',
                    grid=True, grid_type=None, grid_int=None, grid_linestyle=':', grid_linewidth=1.5,
+                   grid_alpha = 0.6, grid_zordwr = 9, grid_color = 'gray',
+                   gxylim=None,
 
                    colorbar=True, annotation=True, silent=False,
-                   dpi=150, ax=None, fig=None, show=False, 
+                   dpi=300, ax=None, fig=None, show=True, 
 
                    vx=None, vy=None, vc1='black', vc2='lightblue', 
                    vwidth=6, vlinewidth=0.4, vscale=None, vskip=None,
@@ -39,9 +43,12 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
     === 圖形樣式參數 ===
         levels (list): 等值線/色階的值，如果為None則自動產生
             例如：np.linspace(-20, 20, 11)
+        colorbar_ticks (list): colorbar標示出色階的位置
+            例如：np.linspace(-20, 20, 11)
         cmap (str): 使用的色彩映射名稱，預設'viridis'
             常用選項：turbo, jet, RdBu_r, seismic, BrBG
         colorbar (bool): 是否顯示色條，預設True
+        
         annotation (bool): 是否顯示統計數據註釋(panel的左下角)，預設True
         
     === 標註與軸參數 ===
@@ -87,14 +94,24 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
                 * 支援經緯線定位與格式化        
         grid_int (tuple or None): 網格線間隔(經度間隔, 緯度間隔)，預設None（自動設定）
             - None: 根據coastline_resolution自動設定
-                * '10m'  → (1°, 1°)
-                * '50m'  → (10°, 10°)
-                * '110m' → (30°, 30°)
+                * '10m'  → (1, 1)
+                * '50m'  → (10, 10)
+                * '110m' → (30, 30)
             - tuple: 手動指定經緯度間隔，例如：(5, 5), (2, 2)        
         grid_linestyle (str): 網格線樣式，預設':'（點線）
             常用選項：'-'（實線）, '--'（虛線）, '-.'（點虛線）, ':'（點線）        
         grid_linewidth (float): 網格線寬度，預設1.5
-        
+        grid_alpha (float): 網格線透明度，預設0.6，數值範圍0-1，0為完全透明，1為完全不透明    
+        grid_zordwr (int): 網格線的繪圖層級，預設9
+            控制網格線在圖層中的前後順序        
+        grid_color (str): 網格線顏色，預設'gray'
+            可使用顏色名稱或十六進位色碼，例如：'black', '#808080'
+    === 地圖範圍參數 ===
+    gxylim (tuple or None): 設定地圖顯示範圍，預設None（自動範圍）
+        - None: 使用預設範圍
+        - tuple: (x_min, x_max, y_min, y_max)，分別指定經度和緯度的顯示範圍
+        例如：(100, 140, 15, 45) 表示經度100-140°E，緯度15-45°N
+
     === 輸出控制參數 ===
         o (str): 輸出檔案路徑，如果為None則不保存
         dpi (int): 圖像解析度，預設150
@@ -103,7 +120,7 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
     === 圖形物件參數 ===
         ax: matplotlib axes物件，若為None則自動創建
         fig: matplotlib figure物件，若為None則自動創建
-        show (bool): 是否執行fig.show()顯示圖形，預設False
+        show (bool): 是否執行fig.show()顯示圖形，預設True
        
     === 向量場參數 ===
         vx (array-like): 向量x分量（水平分量）
@@ -180,9 +197,20 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
 
     v1.8 2025-10-10 增加多組等值線繪製功能
                     支援cnt輸入為list，可同時繪製多組等值線
+                        - cnt: 可設定[vars, hgt_ea_ds_smoothed] 多變數
+                        - ccolor: 可設定['magenta', 'blue']為每組指定顏色
+                        - clevels: 可設定[(levels1_thin, levels1_thick), (levels2_thin, levels2_thick), ...]
+                        - cints: 可設定[(5, 20), (10, 40), ...]為每組指定間隔
+                        - cwidth: 可設定[(0.8, 2.0), (1.0, 2.5), ...]為每組指定線寬
+                        - ctype: 可設定[('-', '-'), ('--', '--'), ...]為每組指定正值線型
+                        - cntype: 可設定[('--', '--'), (':', ':'), ...]為每組指定負值線型
+                        - clab: 可設定[(False, True), (True, True), ...]控制每組是否標註數值
                     所有等值線相關參數都支援list輸入
                     增加title_loc功能
                     增加czorder參數
+                    網格線功能增強
+                    增加Lat-Lon投影自動選擇
+                    設定地圖顯示範圍
     v1.7.1 2025-10-09 增加功能invert_xaxis=False, invert_yaxis=False功能
     v1.7 2025-10-08 增加向量場倍率縮放功能
                     新增vx_bai, vy_bai參數：支援水平/垂直分量分別縮放
@@ -356,7 +384,7 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
     print(f"{ind2}    設定背景顏色: {background_color}")
     if ax is None:
         if projection is not None:
-            print(f"{ind2}    建立新 figure, 使用投影座標系統")
+            print(f"{ind2}    建立新 figure, 使用投影座標系統({type(projection).__name__})")
             fig = plt.figure(figsize=figsize)
             ax = fig.add_subplot(1, 1, 1, projection=projection)
             ax.set_facecolor(background_color)
@@ -386,10 +414,10 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
     # 創建網格數據
     if x is None and y is None:
         # 沒有提供經緯度,使用索引
-        print(f"{ind2}    create X and Y by cols and rows")
+        print(f"{ind2}    create XX and YY by np.meshgrid(np.arange(cols), np.arange(rows)")
         XX, YY = np.meshgrid(np.arange(cols), np.arange(rows))
     elif x is not None and y is not None:
-        print(f"{ind2}    create X and Y from x and y")
+        print(f"{ind2}    create XX and YY from input x and y")
         # 處理xarray DataArray
         if hasattr(x, 'values'):
             if not silent:
@@ -447,14 +475,15 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
         ax.set_ylabel(ylabel, fontsize=10)
     
     # 添加色條
-    if colorbar:
+    if colorbar:        
         cbar = plt.colorbar(cf, ax=ax,
                     orientation='vertical',  # 'vertical' 或 'horizontal'
                     fraction=0.05,           # colorbar 占用 Axes 的比例
                     pad=0.03,                # colorbar 與 Axes 的間距
                     aspect=20,               # 長寬比，數字越大 → colorbar 越細長
                     shrink=0.8,              # 縮放比例 (小於 1 → 縮短)
-                    location='right'  # colorbar 的位置（Matplotlib >= 3.6 支援）
+                    location='right',        # colorbar 的位置（Matplotlib >= 3.6 支援）
+                    ticks=colorbar_ticks     # 明確指定ticks位置
                     )
         cbar.ax.tick_params(labelsize=10)
     
@@ -469,17 +498,17 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
                horizontalalignment='left',
                verticalalignment='bottom',
                transform=ax.transAxes,
-               fontsize=7, alpha=1.0,
+               fontsize=5, alpha=1.0,
                zorder=90,
                bbox=dict(facecolor='white', alpha=0.8, edgecolor='gray', boxstyle='round,pad=0.5'))
         
     # ============ 參考線繪製 ============  
     # 添加海岸線（如果有投影）
-    if transform is not None and coastline is not None:
-        print(f"{ind2}draw coastline: color: {coastline}, width: {coastline_width}")   
-        ax.coastlines(coastline_resolution, linewidth=coastline_width[0], color=coastline[0],
+    if transform is not None and coastline_color is not None:
+        print(f"{ind2}draw coastline: color: {coastline_color}, width: {coastline_width}")   
+        ax.coastlines(coastline_resolution, linewidth=coastline_width[0], color=coastline_color[0],
                       zorder=4, alpha=0.8)
-        ax.coastlines(coastline_resolution, linewidth=coastline_width[1], color=coastline[1],
+        ax.coastlines(coastline_resolution, linewidth=coastline_width[1], color=coastline_color[1],
                       zorder=5, alpha=0.8)
     
     #print(type(transform).__name__)
@@ -489,21 +518,45 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
     # 顯示網格線
     print(f"{ind2}draw grid:")   
     if grid:
-        grid_int = {'10m': (1, 1), '50m': (10, 10), '110m': (30, 30)}.get(coastline_resolution, (10, 10))
-        xlocs = np.arange(-180, 361, grid_int[0])
-        ylocs = np.arange(-90, 91, grid_int[1])
+        if grid_int is None:
+            grid_int = {'10m': (1, 1), '50m': (10, 10), '110m': (30, 30)}.get(coastline_resolution, (10, 10))
+        xlocs = np.sort(np.concatenate([-np.arange(grid_int[0], 361, grid_int[0])[::-1], np.arange(0, 361, grid_int[0])]))
+        ylocs = np.sort(np.concatenate([-np.arange(grid_int[1], 91, grid_int[1])[::-1], np.arange(0, 91, grid_int[1])]))
+        #xlocs = np.arange(-180, 361, grid_int[0])
+        #ylocs = np.arange(-90, 91, grid_int[1])
         print(f"{ind2}    grid interval: {grid_int[0]}° (lon) × {grid_int[1]}° (lat)")
+
+        if (grid_type == None and type(projection).__name__ == 'PlateCarree') or (grid_type == 3) or (grid_type == 'Lat-Lon'):
+            from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
+            print(f"{ind2}    grid type: gridlines with labels (for PlateCarree)")   
+            # 原本的經緯網格線（只畫線，不畫標籤）
+            gl = ax.gridlines(crs=transform, 
+                              draw_labels=False,
+                              linewidth=grid_linewidth, 
+                              color=grid_color, 
+                              alpha=grid_alpha, 
+                              linestyle=grid_linestyle,
+                              xlocs=xlocs, ylocs=ylocs, 
+                              zorder=grid_zordwr)
         
-        if (grid_type == None and type(projection).__name__ == 'LambertConformal') or (grid_type == 2) or (grid_type == 'Lambert'):
+            # 新增 tick marks 和標籤格式
+            ax.set_xticks(xlocs, crs=transform)
+            ax.set_yticks(ylocs, crs=transform)
+            ax.tick_params(axis='both', which='major', length=6, width=1.5, 
+                           labelsize=10, color='black', labelcolor='black')
+            ax.xaxis.set_major_formatter(LONGITUDE_FORMATTER)
+            ax.yaxis.set_major_formatter(LATITUDE_FORMATTER) 
+
+        elif (grid_type == None and type(projection).__name__ == 'LambertConformal') or (grid_type == 2) or (grid_type == 'Lambert'):            
             print(f"{ind2}    grid type: gridlines with labels (for LambertConformal)")
             # 設定經緯度網格線 - for ccrs.LambertConformal
             gl = ax.gridlines(
                 draw_labels={'bottom': 'x', 'left': 'y'},  # 明確指定標籤位置
                 linewidth=grid_linewidth,
-                color='gray',
-                alpha=0.6,
+                color=grid_color,
+                alpha=grid_alpha,
                 linestyle=grid_linestyle,
-                zorder=9,
+                zorder=grid_zordwr,
                 x_inline=False,  # 不要內嵌標籤
                 y_inline=False,
                 rotate_labels=False  # 關鍵:防止標籤旋轉
@@ -519,7 +572,11 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
 
         elif (grid_type == None) or (grid_type == 1):
             print(f"{ind2}    grid type: basic grid (ax.grid)")
-            ax.grid(True, linestyle=grid_linestyle, alpha=0.6, zorder=9, linewidth=grid_linewidth) 
+            #ax.set_xticks(xlocs)  
+            #ax.set_yticks(ylocs)    
+            ax.grid(True, linestyle=grid_linestyle, alpha=grid_alpha, 
+                    color=grid_color,
+                    zorder=grid_zordwr, linewidth=grid_linewidth) 
             
         else:    
             print(f"{ind2}    grid type do not find")
@@ -527,6 +584,11 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
     else:        
         print(f"{ind2}    grid disabled")
     
+    if gxylim is not None:
+        ax.set_xlim(gxylim[0], gxylim[1])  # 經度/x 範圍
+        ax.set_ylim(gxylim[2], gxylim[3])  # 緯度/y 範圍
+        print(f"{ind2}    map extent: {ax.get_extent()}")
+
     # ============ 向量場繪製 ============
     if not silent:
         print(f"{ind2}向量場繪製:")
@@ -705,7 +767,7 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
                          fontproperties={'size': 10}, zorder=99)
 
     else:        
-        print(f"{ind2}vector disabled")
+        print(f"{ind2}    vector disabled")
 
     # ============ 等值線繪製 ============
     if not silent:
