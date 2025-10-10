@@ -2,7 +2,7 @@
 # 視覺化一個輸入陣列
 #--------------------------------------------
 def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(5, 5),
-                   o=None, title=None,
+                   o=None, title=None, title_loc='left',
                    
                    transform=None, projection=None,
                    xlabel=None, ylabel=None, indent=0, 
@@ -21,6 +21,7 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
 
                    cnt=None, ccolor='magenta', clevels=None, cints=None,
                    cwidth=(0.8, 2.0), ctype=('-', '-'), cntype=('--', '--'), clab=(False, True),
+                   czorder=None,  
 
                    invert_xaxis=False, invert_yaxis=False
                    ):
@@ -45,6 +46,7 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
         
     === 標註與軸參數 ===
         title (str): 圖形標題
+        title_loc (str): 標題定位，預設'left'
         xlabel (str): x軸標籤
         ylabel (str): y軸標籤
         indent (int): 終端輸出縮排空格數，預設0
@@ -164,6 +166,11 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
         clab (tuple or list of tuple): 是否標示數值(細線, 粗線)，預設(False, True) 只在粗線上標註數值
             - (True, True): 細線和粗線都標註數值
             - (False, False): 都不標註
+        czorder (int or list of int or None): 等值線的繪圖層級(zorder)，預設None
+            - None: 自動設定，第一組為70，之後每組+1 (70, 71, 72, ...)
+            - int: 單一值，所有等值線使用相同zorder
+            - list of int: 為每組等值線指定不同zorder
+            例如：80 或 [80, 81, 82]
     
     === 軸向控制參數 ===
         invert_xaxis (bool): 是否反轉x軸，預設False
@@ -171,9 +178,11 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
         invert_yaxis (bool): 是否反轉y軸，預設False
             True時y軸數值由大到小排列（常用於氣壓座標）
 
-    v1.8 2025-10-09 增加多組等值線繪製功能
+    v1.8 2025-10-10 增加多組等值線繪製功能
                     支援cnt輸入為list，可同時繪製多組等值線
                     所有等值線相關參數都支援list輸入
+                    增加title_loc功能
+                    增加czorder參數
     v1.7.1 2025-10-09 增加功能invert_xaxis=False, invert_yaxis=False功能
     v1.7 2025-10-08 增加向量場倍率縮放功能
                     新增vx_bai, vy_bai參數：支援水平/垂直分量分別縮放
@@ -431,7 +440,7 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
     
     # 添加標題和軸標籤    
     if title:
-        ax.set_title(title, fontsize=10, pad=9, fontweight='bold')
+        ax.set_title(title, fontsize=10, pad=9, fontweight='bold', loc=title_loc)
     if xlabel:
         ax.set_xlabel(xlabel, fontsize=10)
     if ylabel:
@@ -715,26 +724,49 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
         
         # 處理各等值線參數，統一轉換為列表格式
         def _make_list(param, n, param_name):
-            """將參數統一轉換為列表格式"""
+            """將參數統一轉換為列表格式
+            
+            對於tuple/list類型的參數（如cwidth, clab），判斷其第一個元素是否為容器來區分單組/多組
+            對於其他類型的參數（如czorder, ccolor），直接判斷列表長度
+            """
             if param is None:
                 return [None] * n
-            elif isinstance(param, (list, tuple)) and n > 1:
-                if len(param) != n:
-                    print(f"{ind2}    警告: {param_name}的長度({len(param)})與cnt數量({n})不符，使用第一個值")
-                    return [param[0]] * n
-                return list(param)
+            elif isinstance(param, (list, tuple)):
+                # 特殊處理：如果參數名稱表明是純數值或字串類型（如czorder, ccolor）
+                if param_name in ['czorder', 'ccolor']:
+                    # 這些參數不會有嵌套結構
+                    if len(param) == n:
+                        # 長度匹配，視為多組設定
+                        return list(param)
+                    else:
+                        # 長度不匹配，視為單組設定（複製）
+                        return [param] * n
+                else:
+                    # 其他參數（cwidth, clab, ctype等）需要檢查嵌套
+                    if (len(param) > 0 and isinstance(param[0], (list, tuple))):
+                        # 多組設定
+                        if len(param) != n:
+                            print(f"{ind2}    警告: {param_name}的長度({len(param)})與cnt數量({n})不符，使用第一個值")
+                            return [param[0]] * n
+                        return list(param)
+                    else:
+                        # 單組設定，複製給所有等值線
+                        return [param] * n
             else:
+                # 單一值，複製給所有等值線
                 return [param] * n
-        
+
         # 轉換所有等值線相關參數
         ccolor_list = _make_list(ccolor, n_contours, 'ccolor')
         clevels_list = _make_list(clevels, n_contours, 'clevels')
+        #clevels_list = clevels
         cints_list = _make_list(cints, n_contours, 'cints')
         cwidth_list = _make_list(cwidth, n_contours, 'cwidth')
         ctype_list = _make_list(ctype, n_contours, 'ctype')
         cntype_list = _make_list(cntype, n_contours, 'cntype')
         clab_list = _make_list(clab, n_contours, 'clab')
-        
+        czorder_list = _make_list(czorder, n_contours, 'czorder')  
+                
         # 初始化統計資訊字典
         stats['contour_stats'] = []
         
@@ -745,11 +777,14 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
             cnt_current = cnt_list[i_cnt]
             ccolor_current = ccolor_list[i_cnt]
             clevels_current = clevels_list[i_cnt]
+            if clevels_current == (None, None): clevels_current = None
             cints_current = cints_list[i_cnt]
+            if cints_current == (None, None): cints_current = None
             cwidth_current = cwidth_list[i_cnt]
             ctype_current = ctype_list[i_cnt]
             cntype_current = cntype_list[i_cnt]
             clab_current = clab_list[i_cnt]
+            #czorder_list = czorder_list[i_cnt]
             
             # 處理等值線數據（支援xarray和pint）
             cnt_data = cnt_current
@@ -798,6 +833,8 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
                     print(f"{ind2}            NaN:          {cnt_nan_count}/{cnt_data.size} ({cnt_nan_percent:.2f}%)")
 
                 # 自動設定clevels（如果沒有提供）
+                #print(cints_current)
+                #print(clevels_current)
                 if clevels_current is None and cints_current is None:
                     n_bins = int(np.ceil(np.log2(len(cnt_valid)) + 1))
                     all_levels = MaxNLocator(nbins=n_bins).tick_values(
@@ -830,8 +867,16 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
                     print(f"{ind2}       +線型: {ctype_current}")
                     print(f"{ind2}       -線型: {cntype_current}")
 
-                # 計算zorder基礎值（每組等值線間隔1）
-                zorder_base = 70 + i_cnt * 1
+                # 計算zorder基礎值
+                #print(czorder_list)
+                if czorder_list[i_cnt] is not None:
+                    zorder_base = czorder_list[i_cnt]
+                    if not silent:
+                        print(f"{ind2}        使用自訂zorder: {zorder_base}")
+                else:
+                    zorder_base = 70 + i_cnt * 1
+                    if not silent:
+                        print(f"{ind2}        自動設定zorder: {zorder_base}")
                 
                 # 繪製細線等值線
                 if len(clevels1_filtered) > 0:
@@ -851,7 +896,7 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
                     if clab_current[0]:
                         labels1 = ax.clabel(contours1, inline=True, fontsize=10,
                                            fmt=lambda x: f'{x:g}' if x >= 0 else f'–{abs(x):g}',
-                                           inline_spacing=1, zorder=zorder_base+1)
+                                           inline_spacing=1, zorder=zorder_base)
                         for label in labels1:
                             label.set_fontweight(500)
                             label.set_fontsize(10)
@@ -874,7 +919,7 @@ def plot_2D_shaded(array, x=None, y=None, levels=None, cmap='viridis', figsize=(
                     if clab_current[1]:
                         labels2 = ax.clabel(contours2, inline=True, fontsize=10,
                                            fmt=lambda x: f'{x:g}' if x >= 0 else f'–{abs(x):g}',
-                                           inline_spacing=1, zorder=zorder_base+1)
+                                           inline_spacing=1, zorder=zorder_base)
                         for label in labels2:
                             label.set_fontweight(500)
                             label.set_fontsize(10)
