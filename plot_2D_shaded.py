@@ -5,14 +5,21 @@ def plot_2D_shaded(array, x=None, y=None,
                    levels=None, cmap='viridis', colorbar_ticks=None,
 
                    figsize=(5, 5), o=None, title=None, title_loc='left',
+                   system_time=False,
+                   user_info=None,  # 可以是字串或字串列表
+                   user_info_loc='upper right',  # 位置選項: 'upper/lower' + 'left/right'
+                   user_info_fontsize=5,
+                   user_info_offset=(0.00, 0.00),
                    
                    projection=None, transform=None, 
                    xlabel=None, ylabel=None, indent=0, 
 
                    coastline_color=('yellow', 'black'), coastline_width=(1.7, 1.5), coastline_resolution='50m',
-                   grid=True, grid_type=None, grid_int=None, grid_linestyle=':', grid_linewidth=1.5,
-                   grid_alpha = 0.6, grid_zordwr = 9, grid_color = 'gray',
+                   grid=True, grid_type=None, 
+                   grid_int=None, grid_xticks = None, grid_yticks = None,
+                   grid_linestyle=':', grid_linewidth=1.5, grid_alpha = 0.6, grid_zordwr = 9, grid_color = 'gray',
                    gxylim=None,
+                   xaxis_DateFormatter=None, yaxis_DateFormatter=None,
 
                    colorbar=True, annotation=True, silent=False,
                    dpi=300, ax=None, fig=None, show=True, 
@@ -48,7 +55,6 @@ def plot_2D_shaded(array, x=None, y=None,
         cmap (str): 使用的色彩映射名稱，預設'viridis'
             常用選項：turbo, jet, RdBu_r, seismic, BrBG
         colorbar (bool): 是否顯示色條，預設True
-        
         annotation (bool): 是否顯示統計數據註釋(panel的左下角)，預設True
         
     === 標註與軸參數 ===
@@ -97,7 +103,30 @@ def plot_2D_shaded(array, x=None, y=None,
                 * '10m'  → (1, 1)
                 * '50m'  → (10, 10)
                 * '110m' → (30, 30)
-            - tuple: 手動指定經緯度間隔，例如：(5, 5), (2, 2)        
+            - tuple: 手動指定經緯度間隔，例如：(5, 5), (2, 2)    
+        grid_xticks (array-like or None): 手動指定經度網格線位置，預設None
+            - None: 使用grid_int自動生成的經度位置
+            - array-like: 明確指定每條經度線的位置
+            例如：[100, 110, 120, 130, 140]表示只在這些經度畫網格線
+            例如：np.arange(100, 141, 5)表示從100°E到140°E每5度畫一條線
+        grid_yticks (array-like or None): 手動指定緯度網格線位置，預設None
+            - None: 使用grid_int自動生成的緯度位置
+            - array-like: 明確指定每條緯度線的位置
+            例如：[20, 25, 30, 35, 40]表示只在這些緯度畫網格線
+            例如：np.arange(15, 46, 5)表示從15°N到45°N每5度畫一條線    
+        xaxis_DateFormatter : str, optional
+            x 軸的日期格式字串，如 '%d %b', '%Y-%m-%d'
+            使用 matplotlib.dates.DateFormatter 格式代碼
+            常用組合範例：
+                - mdates.DateFormatter('%Y/%m/%d %H:%M')  # 2024/10/15 14:30
+                - mdates.DateFormatter('%m/%d\n%H:%M')    # 10/15
+                                                            14:30
+                - mdates.DateFormatter('%d %b %Y')        # 15 Oct 2024
+                - mdates.DateFormatter('%b %d')           # Oct 15
+                - mdates.DateFormatter('%d %B')           # 15 October
+        yaxis_DateFormatter : str, optional
+            y 軸的日期格式字串
+            使用 matplotlib.dates.DateFormatter 格式代碼
         grid_linestyle (str): 網格線樣式，預設':'（點線）
             常用選項：'-'（實線）, '--'（虛線）, '-.'（點虛線）, ':'（點線）        
         grid_linewidth (float): 網格線寬度，預設1.5
@@ -106,6 +135,7 @@ def plot_2D_shaded(array, x=None, y=None,
             控制網格線在圖層中的前後順序        
         grid_color (str): 網格線顏色，預設'gray'
             可使用顏色名稱或十六進位色碼，例如：'black', '#808080'
+    
     === 地圖範圍參數 ===
     gxylim (tuple or None): 設定地圖顯示範圍，預設None（自動範圍）
         - None: 使用預設範圍
@@ -195,7 +225,29 @@ def plot_2D_shaded(array, x=None, y=None,
         invert_yaxis (bool): 是否反轉y軸，預設False
             True時y軸數值由大到小排列（常用於氣壓座標）
 
-    v1.8 2025-10-10 增加多組等值線繪製功能
+    === 圖形資訊標註參數 ===
+        system_time (bool): 是否在圖形左下角標註系統時間，預設False
+            - True: 在figure左下角顯示圖形創建時間（格式：YYYY-MM-DD HH:MM:SS）
+            - False: 不顯示系統時間
+            - 系統時間使用小字體，不干擾主要視覺化內容            
+        user_info (str or list or None): 使用者自訂資訊文字，預設None
+            - None: 不顯示使用者資訊
+            - str: 單行文字，例如："Experiment A"
+            - list/tuple: 多行文字，每個元素為一行
+            例如：["Model: WRF", "Resolution: 3km", "Date: 2024-10-22"]            
+        user_info_loc (str): 使用者資訊的顯示位置，預設'upper right'
+            - 'upper right': 圖形區域右上角
+            - 'upper left': 圖形區域左上角
+            - 'lower right': 圖形區域右下角
+            - 'lower left': 圖形區域左下角
+            注意：此位置是相對於繪圖區域(ax)  
+        user_info_offset (tuple): 使用者資訊位置的偏移量(x_offset, y_offset)，預設(0.00, 0.00)
+            - 用於微調使用者資訊的顯示位置，正值向右/向上移動，負值向左/向下移動
+            例如：(0.05, -0.05)表示向右移動5%，向下移動5%
+            例如：(-0.10, 0.00)表示向左移動10%，垂直位置不變      
+        user_info_fontsize (int): 使用者資訊的字體大小，預設5        
+
+    v1.8 2025-10-11 增加多組等值線繪製功能
                     支援cnt輸入為list，可同時繪製多組等值線
                         - cnt: 可設定[vars, hgt_ea_ds_smoothed] 多變數
                         - ccolor: 可設定['magenta', 'blue']為每組指定顏色
@@ -211,6 +263,7 @@ def plot_2D_shaded(array, x=None, y=None,
                     網格線功能增強
                     增加Lat-Lon投影自動選擇
                     設定地圖顯示範圍
+                    增加系統時間與使用者資訊標註功能
     v1.7.1 2025-10-09 增加功能invert_xaxis=False, invert_yaxis=False功能
     v1.7 2025-10-08 增加向量場倍率縮放功能
                     新增vx_bai, vy_bai參數：支援水平/垂直分量分別縮放
@@ -239,15 +292,19 @@ def plot_2D_shaded(array, x=None, y=None,
 
 
     import numpy as np
-    import matplotlib.pyplot as plt
+    import xarray as xr 
+    import pandas as pd       
     from matplotlib import colormaps
+    from matplotlib.ticker import MaxNLocator
     import matplotlib as matplotlib
+    import matplotlib.pyplot as plt
+    import matplotlib.dates as mdates
+    import matplotlib.ticker as mticker     
     import matplotlib.colors as mcolors
     import cartopy.crs as ccrs
     import cartopy.feature as cfeature
-    from matplotlib.ticker import MaxNLocator
-    import matplotlib.ticker as mticker     
-    import cartopy.mpl.ticker as cticker    
+    import cartopy.mpl.ticker as cticker   
+    from datetime import datetime
 
     plt.rcParams['font.sans-serif'] = ['DejaVu Sans', 'Arial', 'sans-serif']
     plt.rcParams['axes.unicode_minus'] = False
@@ -518,17 +575,25 @@ def plot_2D_shaded(array, x=None, y=None,
     # 顯示網格線
     print(f"{ind2}draw grid:")   
     if grid:
+
+        # 如果沒有指定網格間隔,根據海岸線解析度自動設定
         if grid_int is None:
-            grid_int = {'10m': (1, 1), '50m': (10, 10), '110m': (30, 30)}.get(coastline_resolution, (10, 10))
-        xlocs = np.sort(np.concatenate([-np.arange(grid_int[0], 361, grid_int[0])[::-1], np.arange(0, 361, grid_int[0])]))
-        ylocs = np.sort(np.concatenate([-np.arange(grid_int[1], 91, grid_int[1])[::-1], np.arange(0, 91, grid_int[1])]))
-        #xlocs = np.arange(-180, 361, grid_int[0])
-        #ylocs = np.arange(-90, 91, grid_int[1])
-        print(f"{ind2}    grid interval: {grid_int[0]}° (lon) × {grid_int[1]}° (lat)")
+            grid_int = {'10m': (2, 2), '50m': (10, 10), '110m': (30, 30)}.get(coastline_resolution, (10, 10))
 
         if (grid_type == None and type(projection).__name__ == 'PlateCarree') or (grid_type == 3) or (grid_type == 'Lat-Lon'):
             from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
             print(f"{ind2}    grid type: gridlines with labels (for PlateCarree)")   
+            
+            xlocs = np.sort(np.concatenate([-np.arange(grid_int[0], 361, grid_int[0])[::-1], np.arange(0, 361, grid_int[0])]))
+            ylocs = np.sort(np.concatenate([-np.arange(grid_int[1], 91, grid_int[1])[::-1], np.arange(0, 91, grid_int[1])]))            
+            print(f"{ind2}    grid interval: {grid_int[0]}° (lon) × {grid_int[1]}° (lat)")
+            
+            # 如果使用者手動指定網格線位置,覆寫自動生成的位置
+            if grid_xticks is not None:
+                xlocs = grid_xticks
+            if grid_yticks is not None:
+                ylocs = grid_yticks
+
             # 原本的經緯網格線（只畫線，不畫標籤）
             gl = ax.gridlines(crs=transform, 
                               draw_labels=False,
@@ -545,11 +610,27 @@ def plot_2D_shaded(array, x=None, y=None,
             ax.tick_params(axis='both', which='major', length=6, width=1.5, 
                            labelsize=10, color='black', labelcolor='black')
             ax.xaxis.set_major_formatter(LONGITUDE_FORMATTER)
-            ax.yaxis.set_major_formatter(LATITUDE_FORMATTER) 
+            ax.yaxis.set_major_formatter(LATITUDE_FORMATTER)
+
+            if gxylim is not None:
+                ax.set_extent(gxylim, crs=transform)
+                print(f"{ind2}    map extent: {ax.get_extent()}")
 
         elif (grid_type == None and type(projection).__name__ == 'LambertConformal') or (grid_type == 2) or (grid_type == 'Lambert'):            
             print(f"{ind2}    grid type: gridlines with labels (for LambertConformal)")
             # 設定經緯度網格線 - for ccrs.LambertConformal
+
+            # 生成經緯度網格線位置
+            xlocs = np.sort(np.concatenate([-np.arange(grid_int[0], 361, grid_int[0])[::-1], np.arange(0, 361, grid_int[0])]))
+            ylocs = np.sort(np.concatenate([-np.arange(grid_int[1], 91, grid_int[1])[::-1], np.arange(0, 91, grid_int[1])]))            
+            print(f"{ind2}    grid interval: {grid_int[0]}° (lon) × {grid_int[1]}° (lat)")
+            
+            # 如果使用者手動指定網格線位置,覆寫自動生成的位置
+            if grid_xticks is not None:
+                xlocs = grid_xticks
+            if grid_yticks is not None:
+                ylocs = grid_yticks
+
             gl = ax.gridlines(
                 draw_labels={'bottom': 'x', 'left': 'y'},  # 明確指定標籤位置
                 linewidth=grid_linewidth,
@@ -570,24 +651,49 @@ def plot_2D_shaded(array, x=None, y=None,
             gl.xlabel_style = {'size': 10, 'color': 'black', 'rotation': 0}  # 明確設定 rotation=0
             gl.ylabel_style = {'size': 10, 'color': 'black'}
 
+            if gxylim is not None:
+                ax.set_extent(gxylim, crs=transform)
+                print(f"{ind2}    map extent: {ax.get_extent()}")
+
         elif (grid_type == None) or (grid_type == 1):
             print(f"{ind2}    grid type: basic grid (ax.grid)")
-            #ax.set_xticks(xlocs)  
-            #ax.set_yticks(ylocs)    
-            ax.grid(True, linestyle=grid_linestyle, alpha=grid_alpha, 
-                    color=grid_color,
+
+            if grid_xticks is not None:
+                xlocs = grid_xticks
+                ax.set_xticks(xlocs)  
+
+            if grid_yticks is not None:
+                ylocs = grid_yticks
+                ax.set_yticks(ylocs)    
+                        
+            ax.grid(True, 
+                    linestyle=grid_linestyle, alpha=grid_alpha, color=grid_color,
                     zorder=grid_zordwr, linewidth=grid_linewidth) 
-            
+            ax.tick_params(axis='both', which='major', length=6, width=1.5, 
+                    labelsize=10, color='black', labelcolor='black')
+                        
+            if gxylim is not None:
+                ax.set_xlim(gxylim[0], gxylim[1])  # 經度/x 範圍
+                ax.set_ylim(gxylim[2], gxylim[3])  # 緯度/y 範圍
+                print(f"{ind2}    xlim and ylim: {gxylim}")
+           
         else:    
             print(f"{ind2}    grid type do not find")
-            
+     
+        # 適用於時間序列圖表
+        if xaxis_DateFormatter is not None:
+            # xaxis_DateFormatter: 日期格式字串，如 '%H:%M %d %b ' 會顯示為 '00:00 15 Oct '
+            ax.xaxis.set_major_formatter(mdates.DateFormatter(xaxis_DateFormatter))
+            if not silent:
+                print(f"{ind2}    x-axis date format: {xaxis_DateFormatter}")
+        if yaxis_DateFormatter is not None:
+            ax.yaxis.set_major_formatter(mdates.DateFormatter(yaxis_DateFormatter))
+            if not silent:
+                print(f"{ind2}    y-axis date format: {yaxis_DateFormatter}")
+        
     else:        
         print(f"{ind2}    grid disabled")
     
-    if gxylim is not None:
-        ax.set_xlim(gxylim[0], gxylim[1])  # 經度/x 範圍
-        ax.set_ylim(gxylim[2], gxylim[3])  # 緯度/y 範圍
-        print(f"{ind2}    map extent: {ax.get_extent()}")
 
     # ============ 向量場繪製 ============
     if not silent:
@@ -1010,6 +1116,58 @@ def plot_2D_shaded(array, x=None, y=None,
         # 讓 y 軸反轉
         ax.invert_yaxis()
     
+    # ============ 系統時間標註 ============
+    if system_time:
+        from datetime import datetime
+        current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        # 使用 fig.text 在 figure 座標系統中標註
+        # 位置 (0.01, 0.01) 表示左下角,略微偏移避免貼邊
+        fig.text(0.00, -0.03, f'Created: {current_time}', 
+                fontsize=5, color='black', alpha=1.0,
+                ha='left', va='top',
+                transform=fig.transFigure,
+                zorder=100)
+        if not silent:
+            print(f"{ind2}系統時間標註: {current_time}")
+
+    # ============ 使用者資訊標註 ============
+    if user_info is not None:
+        # 處理輸入格式
+        if isinstance(user_info, str):
+            info_text = user_info
+        elif isinstance(user_info, (list, tuple)):
+            info_text = '\n'.join(str(item) for item in user_info)
+        else:
+            info_text = str(user_info)
+        
+        # 根據位置參數決定座標
+        loc_dict = {
+            'upper right': (1.00, 1.01, 'right', 'bottom'),
+            'upper left': (-0.02, 1.04, 'right', 'bottom'),
+            'lower right': (1.02, -0.03, 'left', 'top'),
+            'lower left': (0.00, -0.08, 'left', 'top'),
+        }
+        
+        if user_info_loc in loc_dict:
+            x_pos, y_pos, ha, va = loc_dict[user_info_loc]
+        else:
+            x_pos, y_pos, ha, va = 0.98, 0.98, 'right', 'top'
+        
+        # 應用位置偏移量（在ax.transAxes座標系統中，範圍為0-1）
+        x_pos = x_pos + user_info_offset[0]
+        y_pos = y_pos + user_info_offset[1]
+
+        ax.text(x_pos, y_pos, info_text,
+               horizontalalignment=ha,
+               verticalalignment=va,
+               transform=ax.transAxes,
+               fontsize=user_info_fontsize,
+               alpha=1.0,
+               zorder=95)
+        
+        if not silent:
+            print(f"{ind2}使用者資訊標註於: {user_info_loc}\n{info_text}")
+
     # ============ After Draw ============
     if show:
         fig.tight_layout()
