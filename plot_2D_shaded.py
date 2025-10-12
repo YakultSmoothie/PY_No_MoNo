@@ -1,6 +1,3 @@
-#--------------------------------------------
-# 視覺化一個輸入陣列
-#--------------------------------------------
 def plot_2D_shaded(array, x=None, y=None, annotation=True,
                    levels=None, cmap='viridis', 
 
@@ -28,9 +25,6 @@ def plot_2D_shaded(array, x=None, y=None, annotation=True,
                    gxylim=None,
                    xaxis_DateFormatter=None, yaxis_DateFormatter=None,
 
-                   silent=False,
-                   dpi=300, ax=None, fig=None, show=True, 
-
                    vx=None, vy=None, vc1='black', vc2='lightblue', 
                    vwidth=6, vlinewidth=0.4, vscale=None, vskip=None,
                    vref=None, vunit=None, vkey_offset=(0.00, 0.00),
@@ -41,7 +35,9 @@ def plot_2D_shaded(array, x=None, y=None, annotation=True,
                    cwidth=(0.8, 2.0), ctype=('-', '-'), cntype=('--', '--'), clab=(False, True),
                    czorder=None,  
 
-                   invert_xaxis=False, invert_yaxis=False
+                   invert_xaxis=False, invert_yaxis=False,
+
+                   silent=False, dpi=300, ax=None, fig=None, show=True 
                    ):
     '''
     快速將NumPy陣列繪製成2D圖像進行可視化分析，支援向量場疊加與多組等值線
