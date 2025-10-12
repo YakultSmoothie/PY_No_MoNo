@@ -1,10 +1,17 @@
 #--------------------------------------------
 # 視覺化一個輸入陣列
 #--------------------------------------------
-def plot_2D_shaded(array, x=None, y=None, 
-                   levels=None, cmap='viridis', colorbar_ticks=None,
+def plot_2D_shaded(array, x=None, y=None, annotation=True,
+                   levels=None, cmap='viridis', 
 
-                   figsize=(5, 5), o=None, title=None, title_loc='left',
+                   colorbar=True, colorbar_location='right',      
+                   colorbar_ticks=None, colorbar_label=None,                 
+                   colorbar_offset=0,           
+                   colorbar_fraction_offset=0,     
+                   colorbar_shrink_offset=0,       
+                   colorbar_aspect_offset=1,     
+
+                   figsize=(6, 5), o=None, title=None, title_loc='left',
                    system_time=False,
                    user_info=None,  # 可以是字串或字串列表
                    user_info_loc='upper right',  # 位置選項: 'upper/lower' + 'left/right'
@@ -16,12 +23,12 @@ def plot_2D_shaded(array, x=None, y=None,
 
                    coastline_color=('yellow', 'black'), coastline_width=(1.7, 1.5), coastline_resolution='50m',
                    grid=True, grid_type=None, 
-                   grid_int=None, grid_xticks = None, grid_yticks = None,
+                   grid_int=None, grid_xticks = None, grid_yticks = None, grid_xticks_labels = None, grid_yticks_labels = None,
                    grid_linestyle=':', grid_linewidth=1.5, grid_alpha = 0.6, grid_zordwr = 9, grid_color = 'gray',
                    gxylim=None,
                    xaxis_DateFormatter=None, yaxis_DateFormatter=None,
 
-                   colorbar=True, annotation=True, silent=False,
+                   silent=False,
                    dpi=300, ax=None, fig=None, show=True, 
 
                    vx=None, vy=None, vc1='black', vc2='lightblue', 
@@ -49,14 +56,40 @@ def plot_2D_shaded(array, x=None, y=None,
         
     === 圖形樣式參數 ===
         levels (list): 等值線/色階的值，如果為None則自動產生
-            例如：np.linspace(-20, 20, 11)
-        colorbar_ticks (list): colorbar標示出色階的位置
-            例如：np.linspace(-20, 20, 11)
+            例如：np.linspace(-20, 20, 11)        
         cmap (str): 使用的色彩映射名稱，預設'viridis'
             常用選項：turbo, jet, RdBu_r, seismic, BrBG
-        colorbar (bool): 是否顯示色條，預設True
         annotation (bool): 是否顯示統計數據註釋(panel的左下角)，預設True
-        
+
+    ============ Colorbar 參數說明 ============
+        colorbar (bool): 是否繪製 colorbar（預設：True）
+        colorbar_location: colorbar 的位置 ('right', 'left', 'top', 'bottom')（預設：'right'）
+            - 決定 colorbar 放置在圖的哪一側
+            - 自動設定對應的 orientation (vertical/horizontal)
+        colorbar_offset (pad): colorbar 與 Axes 之間的間距（預設：0）
+           - 正值推離圖表，負值拉近圖表
+        colorbar_shrink_offset: colorbar 長度的縮放倍率（預設：1.0）
+           - >1 加長，<1 縮短
+           - 影響 colorbar 沿著主軸方向（vertical時為高度，horizontal時為寬度）的長度
+        colorbar_aspect_offset: colorbar 寬度（粗細）的調整倍率（預設：1.0）           
+           - >1 變寬（變粗），<1 變細           
+        colorbar_fraction_offset: 預留給 colorbar 的空間比例調整（預設：0）
+           - 當空間不足時，shrink 與 aspect 的調整效果會受限，colorbar 可能出現非預期變形
+           - 此時需增加 fraction 提供更多空間
+        colorbar_label (str or None): colorbar 的標籤文字（預設：None）
+           - 若指定字串，使用該字串作為標籤
+           - 若為 None 且數據有單位屬性，自動使用 '[單位]' 格式
+           - 若為 None 且數據無單位，不顯示標籤
+        colorbar_ticks (list or None): colorbar 上標示刻度的位置（預設：None）
+           - 明確指定要顯示哪些數值的刻度
+           - 例如：np.linspace(-20, 20, 11) 會在 -20 到 20 之間均勻產生 11 個刻度
+           - 若為 None，matplotlib 自動決定刻度位置
+      調整順序建議：
+      1. 先調整 shrink 控制長度
+      2. 再調整 aspect 控制粗細（aspect 會自動隨 shrink 等比縮放以保持寬度一致）
+      3. 若變形不如預期，增加 fraction 預留更多空間
+      4. 最後調整 pad 控制間距
+
     === 標註與軸參數 ===
         title (str): 圖形標題
         title_loc (str): 標題定位，預設'left'
@@ -518,6 +551,8 @@ def plot_2D_shaded(array, x=None, y=None,
     else:
         cf = ax.contourf(XX, YY, array, levels=levels, cmap=cmap_obj, extend='both', zorder=0)
     
+    stats['contourf'] = cf
+
     # 加粗框
     for spine in ax.spines.values():
         spine.set_linewidth(2.7)
@@ -530,19 +565,70 @@ def plot_2D_shaded(array, x=None, y=None,
         ax.set_xlabel(xlabel, fontsize=10)
     if ylabel:
         ax.set_ylabel(ylabel, fontsize=10)
-    
-    # 添加色條
-    if colorbar:        
+
+    # ============ 添加色條 ============
+    if colorbar:
+        print(f"{ind2}colorbar設定:")
+        
+        # 1. 決定orientation和pad0        
+        if colorbar_location in ['right', 'left']:
+            pad0 = 0.03
+            colorbar_orientation = 'vertical'
+            colorbar_fraction_base = 0.10
+            colorbar_shrink_base = 1.0
+            aspect_base = 15  # 基礎aspect值                
+        else:  # 'top' or 'bottom'
+            colorbar_orientation = 'horizontal'
+            pad0 = 0.15
+            colorbar_fraction_base = 0.15
+            colorbar_shrink_base = 1.0
+            aspect_base = 20  # 基礎aspect值                
+        if not silent:
+            print(f"{ind2}    自動設定orientation: {colorbar_orientation} (location={colorbar_location})")   
+        
+        # 2. 計算實際pad
+        pad_actual = pad0 + colorbar_offset                   
+        colorbar_shrink = colorbar_shrink_base * colorbar_shrink_offset
+        colorbar_fraction = colorbar_fraction_base + colorbar_fraction_offset
+        colorbar_aspect = aspect_base * (colorbar_shrink / colorbar_shrink_base) * (1 / colorbar_aspect_offset)
+        
+        if not silent:            
+            print(f"{ind2}    pad: base={pad0}, offset= + {colorbar_offset}, final={pad_actual}")
+            print(f"{ind2}    fraction: base={colorbar_fraction_base}, offset= + {colorbar_fraction_offset}, final={colorbar_fraction}")
+            print(f"{ind2}    shrink: base={colorbar_shrink_base}, offset(倍率)= * {colorbar_shrink_offset}, final={colorbar_shrink}")
+            print(f"{ind2}    aspect: base={aspect_base}, offset(倍率)= * {colorbar_shrink/colorbar_shrink_base} / {colorbar_aspect_offset:.2f}, final={colorbar_aspect:.2f}")
+                    
+        # 4. 繪製colorbar
         cbar = plt.colorbar(cf, ax=ax,
-                    orientation='vertical',  # 'vertical' 或 'horizontal'
-                    fraction=0.05,           # colorbar 占用 Axes 的比例
-                    pad=0.03,                # colorbar 與 Axes 的間距
-                    aspect=20,               # 長寬比，數字越大 → colorbar 越細長
-                    shrink=0.8,              # 縮放比例 (小於 1 → 縮短)
-                    location='right',        # colorbar 的位置（Matplotlib >= 3.6 支援）
-                    ticks=colorbar_ticks     # 明確指定ticks位置
+                    orientation=colorbar_orientation,  # 'vertical' 或 'horizontal'                    
+                    pad=pad_actual,  # colorbar 與 Axes 的間距
+                    shrink=colorbar_shrink,  # 縮放比例 (小於 1 → 縮短)
+                    fraction=colorbar_fraction,  # colorbar 占用 Axes 的比例
+                    aspect=colorbar_aspect,  # 長寬比 → 數字越大 colorbar 越細長 aspect ratio
+                    location=colorbar_location,  # colorbar 的位置（Matplotlib >= 3.6 支援） 
+                    ticks=colorbar_ticks   # 明確指定ticks位置
                     )
+        # fraction: 預留給 colorbar 的 Axes 空間比例。
+        # 當空間不足時，shrink 與 aspect 的調整效果會受限，colorbar 可能出現非預期變形。
+        # 此時需增加 fraction 提供更多空間。
+        
         cbar.ax.tick_params(labelsize=10)
+        
+        # 5. 設定colorbar標籤
+        if colorbar_label is not None:
+            # 使用者指定的標籤
+            cbar.set_label(colorbar_label, fontsize=10)
+            if not silent:
+                print(f"{ind2}    使用指定colorbar_label: {colorbar_label}")
+        elif has_units:
+            # 自動從數據中提取單位
+            auto_label = f'[{unit_str}]'
+            cbar.set_label(auto_label, fontsize=10)
+            if not silent:
+                print(f"{ind2}    自動設定colorbar_label: {auto_label}")
+        else:
+            if not silent:
+                print(f"{ind2}    無colorbar_label設定")
     
     # 添加統計信息在圖的左下角
     ng = 3
@@ -605,7 +691,7 @@ def plot_2D_shaded(array, x=None, y=None,
                               zorder=grid_zordwr)
         
             # 新增 tick marks 和標籤格式
-            ax.set_xticks(xlocs, crs=transform)
+            ax.set_xticks(xlocs, crs=transform)            
             ax.set_yticks(ylocs, crs=transform)
             ax.tick_params(axis='both', which='major', length=6, width=1.5, 
                            labelsize=10, color='black', labelcolor='black')
@@ -660,11 +746,15 @@ def plot_2D_shaded(array, x=None, y=None,
 
             if grid_xticks is not None:
                 xlocs = grid_xticks
-                ax.set_xticks(xlocs)  
+                if grid_xticks_labels is not None:
+                    print(f"{ind2}    xticks_labels:{grid_xticks_labels}")                
+                ax.set_xticks(xlocs, labels=grid_xticks_labels)  
 
             if grid_yticks is not None:
                 ylocs = grid_yticks
-                ax.set_yticks(ylocs)    
+                if grid_yticks_labels is not None:
+                    print(f"{ind2}    xticks_labels:{grid_yticks_labels}")
+                ax.set_yticks(ylocs, labels=grid_yticks_labels)    
                         
             ax.grid(True, 
                     linestyle=grid_linestyle, alpha=grid_alpha, color=grid_color,
@@ -846,6 +936,8 @@ def plot_2D_shaded(array, x=None, y=None,
                           scale=vscale, scale_units='inches',
                           zorder=20)
         
+        stats['quiver'] = qu
+
         # 添加quiverkey，位置為(1.05, 1.03) + offset
         qk_x = 1.05 + vkey_offset[0]
         qk_y = 1.03 + vkey_offset[1]
@@ -1119,10 +1211,10 @@ def plot_2D_shaded(array, x=None, y=None,
     # ============ 系統時間標註 ============
     if system_time:
         from datetime import datetime
-        current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        current_time = datetime.now().strftime('%Y-%m-%d\n%H:%M:%S')
         # 使用 fig.text 在 figure 座標系統中標註
         # 位置 (0.01, 0.01) 表示左下角,略微偏移避免貼邊
-        fig.text(0.00, -0.03, f'Created: {current_time}', 
+        fig.text(0.00, -0.03, f'Created:\n{current_time}', 
                 fontsize=5, color='black', alpha=1.0,
                 ha='left', va='top',
                 transform=fig.transFigure,
@@ -1144,14 +1236,13 @@ def plot_2D_shaded(array, x=None, y=None,
         loc_dict = {
             'upper right': (1.00, 1.01, 'right', 'bottom'),
             'upper left': (-0.02, 1.04, 'right', 'bottom'),
-            'lower right': (1.02, -0.03, 'left', 'top'),
-            'lower left': (0.00, -0.08, 'left', 'top'),
+            'lower right': (1.03, -0.05, 'left', 'top'),
+            'lower left': (0.00, -0.10, 'left', 'top'),
         }
         
-        if user_info_loc in loc_dict:
-            x_pos, y_pos, ha, va = loc_dict[user_info_loc]
-        else:
-            x_pos, y_pos, ha, va = 0.98, 0.98, 'right', 'top'
+        if user_info_loc not in loc_dict:
+            user_info_loc = 'upper right'
+        x_pos, y_pos, ha, va = loc_dict[user_info_loc]    
         
         # 應用位置偏移量（在ax.transAxes座標系統中，範圍為0-1）
         x_pos = x_pos + user_info_offset[0]
