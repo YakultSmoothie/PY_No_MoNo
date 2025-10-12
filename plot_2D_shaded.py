@@ -1,5 +1,8 @@
+#--------------------------------------------
+# 視覺化一個輸入陣列
+#--------------------------------------------
 def plot_2D_shaded(array, x=None, y=None, annotation=True,
-                   levels=None, cmap='viridis', 
+                   levels=None, cmap='viridis', levels_norm=None,
 
                    colorbar=True, colorbar_location='right',      
                    colorbar_ticks=None, colorbar_label=None,                 
@@ -48,11 +51,15 @@ def plot_2D_shaded(array, x=None, y=None, annotation=True,
             2D數組，支援多種格式
         x (array-like): 經度座標
         y (array-like): 緯度座標
-        figsize (tuple): 圖形尺寸(寬, 高)，預設(5, 5)
+        figsize (tuple): 圖形尺寸(寬, 高)，預設(6, 5)
         
     === 圖形樣式參數 ===
         levels (list): 等值線/色階的值，如果為None則自動產生
             例如：np.linspace(-20, 20, 11)        
+        levels_norm: 用來控制數值到色彩的映射關係，（預設：None）
+            例如：levels=np.logspace(-17, 17, 18),
+                 levels_norm=LogNorm(vmin=1e-17, vmax=1e17),
+                 colorbar_ticks=np.logspace(-17, 17, 18),
         cmap (str): 使用的色彩映射名稱，預設'viridis'
             常用選項：turbo, jet, RdBu_r, seismic, BrBG
         annotation (bool): 是否顯示統計數據註釋(panel的左下角)，預設True
@@ -285,6 +292,7 @@ def plot_2D_shaded(array, x=None, y=None, annotation=True,
                         - 新增 colorbar_ticks: 可明確指定刻度位置
                         - aspect 自動隨 shrink 等比縮放以保持寬度一致
                         - 根據 location 自動設定最佳預設值（vertical/horizontal）
+                    增加levels_norm功能   
     v1.8 2025-10-11 增加多組等值線繪製功能
                     支援cnt輸入為list，可同時繪製多組等值線
                         - cnt: 可設定[vars, hgt_ea_ds_smoothed] 多變數
@@ -551,10 +559,12 @@ def plot_2D_shaded(array, x=None, y=None, annotation=True,
 
     if transform is not None:
         cf = ax.contourf(XX, YY, array, levels=levels, cmap=cmap_obj, extend='both', zorder=0,
+                         norm=levels_norm, 
                          transform=transform
                          )
     else:
-        cf = ax.contourf(XX, YY, array, levels=levels, cmap=cmap_obj, extend='both', zorder=0)
+        cf = ax.contourf(XX, YY, array, levels=levels, cmap=cmap_obj, extend='both', zorder=0,
+                         norm=levels_norm)
     
     stats['contourf'] = cf
 
