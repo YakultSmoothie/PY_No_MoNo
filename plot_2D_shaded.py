@@ -280,6 +280,15 @@ def plot_2D_shaded(array, x=None, y=None, annotation=True,
             例如：(-0.10, 0.00)表示向左移動10%，垂直位置不變      
         user_info_fontsize (int): 使用者資訊的字體大小，預設5        
 
+    v1.9 2025-10-12 增加多組等值線繪製功能
+                        Colorbar 控制系統重構
+                        - 新增 colorbar_offset: 控制 colorbar 與圖表間距（加法）
+                        - 新增 colorbar_shrink_offset: 控制 colorbar 長度（乘法倍率）
+                        - 新增 colorbar_aspect_offset: 控制 colorbar 粗細（除法倍率，越大越寬）
+                        - 新增 colorbar_fraction_offset: 控制預留空間比例（加法）
+                        - 新增 colorbar_ticks: 可明確指定刻度位置
+                        - aspect 自動隨 shrink 等比縮放以保持寬度一致
+                        - 根據 location 自動設定最佳預設值（vertical/horizontal）
     v1.8 2025-10-11 增加多組等值線繪製功能
                     支援cnt輸入為list，可同時繪製多組等值線
                         - cnt: 可設定[vars, hgt_ea_ds_smoothed] 多變數
