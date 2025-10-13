@@ -139,7 +139,8 @@ def plot_2D_shaded(array, x=None, y=None, annotation=True,
                 * '10m'  → (1, 1)
                 * '50m'  → (10, 10)
                 * '110m' → (30, 30)
-            - tuple: 手動指定經緯度間隔，例如：(5, 5), (2, 2)    
+            - tuple: 手動指定經緯度間隔，例如：(5, 5), (2, 2) 
+            - This parameter do not work when grid_type == 1. Please use grid_xticks and grid_yticks.
         grid_xticks (array-like or None): 手動指定經度網格線位置，預設None
             - None: 使用grid_int自動生成的經度位置
             - array-like: 明確指定每條經度線的位置
@@ -692,8 +693,10 @@ def plot_2D_shaded(array, x=None, y=None, annotation=True,
             # 如果使用者手動指定網格線位置,覆寫自動生成的位置
             if grid_xticks is not None:
                 xlocs = grid_xticks
+                print(f"{ind2}    user set xlocs: {xlocs}")
             if grid_yticks is not None:
                 ylocs = grid_yticks
+                print(f"{ind2}    user set ylocs: {ylocs}")
 
             # 原本的經緯網格線（只畫線，不畫標籤）
             gl = ax.gridlines(crs=transform, 
@@ -720,17 +723,27 @@ def plot_2D_shaded(array, x=None, y=None, annotation=True,
         elif (grid_type == None and type(projection).__name__ == 'LambertConformal') or (grid_type == 2) or (grid_type == 'Lambert'):            
             print(f"{ind2}    grid type: gridlines with labels (for LambertConformal)")
             # 設定經緯度網格線 - for ccrs.LambertConformal
-
-            # 生成經緯度網格線位置
-            xlocs = np.sort(np.concatenate([-np.arange(grid_int[0], 361, grid_int[0])[::-1], np.arange(0, 361, grid_int[0])]))
-            ylocs = np.sort(np.concatenate([-np.arange(grid_int[1], 91, grid_int[1])[::-1], np.arange(0, 91, grid_int[1])]))            
-            print(f"{ind2}    grid interval: {grid_int[0]}° (lon) × {grid_int[1]}° (lat)")
+            # 生成全球網格線位置
+            xlocs_all = np.sort(np.concatenate([-np.arange(grid_int[0], 361, grid_int[0])[::-1], np.arange(0, 361, grid_int[0])]))
+            ylocs_all = np.sort(np.concatenate([-np.arange(grid_int[1], 91, grid_int[1])[::-1], np.arange(0, 91, grid_int[1])]))
+            # 取得數據範圍並擴展一個網格間隔
+            lon_range = [np.nanmin(XX) - grid_int[0], np.nanmax(XX) + grid_int[0]]
+            lat_range = [np.nanmin(YY) - grid_int[1], np.nanmax(YY) + grid_int[1]]
+            #print(f"{ind2}    data range: lon={lon_range}, lat={lat_range}")            
+            # 篩選網格線
+            xlocs = xlocs_all[(xlocs_all >= lon_range[0]) & (xlocs_all <= lon_range[1])].tolist()
+            ylocs = ylocs_all[(ylocs_all >= lat_range[0]) & (ylocs_all <= lat_range[1])].tolist()
             
+            print(f"{ind2}    grid interval: {grid_int[0]}° (lon) × {grid_int[1]}° (lat)")
+            print(f"{ind2}    xlocs: {xlocs}")
+            print(f"{ind2}    ylocs: {ylocs}")
             # 如果使用者手動指定網格線位置,覆寫自動生成的位置
             if grid_xticks is not None:
                 xlocs = grid_xticks
+                print(f"{ind2}    user set xlocs: {xlocs}")
             if grid_yticks is not None:
                 ylocs = grid_yticks
+                print(f"{ind2}    user set ylocs: {ylocs}")
 
             gl = ax.gridlines(
                 draw_labels={'bottom': 'x', 'left': 'y'},  # 明確指定標籤位置
@@ -743,6 +756,8 @@ def plot_2D_shaded(array, x=None, y=None, annotation=True,
                 y_inline=False,
                 rotate_labels=False  # 關鍵:防止標籤旋轉
             )
+            #print(xlocs)          
+            #print(ylocs) 
             # 設定經緯線間隔
             gl.xlocator = mticker.FixedLocator(xlocs)    # 明確指定經度
             gl.ylocator = mticker.FixedLocator(ylocs)    # 明確指定緯度
