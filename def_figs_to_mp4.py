@@ -9,6 +9,7 @@ def figs_to_mp4(fig_list, output_filename='figs_to_mp4.mp4', fps=5, dpi=150):
     from matplotlib.animation import FFMpegWriter
     import numpy as np
     import time
+    import os
     """
     Convert a list of matplotlib figures to mp4 video
     
@@ -24,15 +25,22 @@ def figs_to_mp4(fig_list, output_filename='figs_to_mp4.mp4', fps=5, dpi=150):
     None
     """
     plt.rcParams['figure.max_open_warning'] = 100  # 提高警告閾值
-    if not fig_list:
-        raise ValueError("Error: fig_list is empty !!")
-    
-    start_time = time.time()
-    
+
     print("-" * 70)
     print("Converting figures to MP4 video [Run figs_to_mp4] ...")
     print("-" * 70)
 
+    start_time = time.time()
+
+    if not fig_list:
+        raise ValueError("Error: fig_list is empty !!")
+    
+    # 確保輸出路徑存在
+    output_dir = os.path.dirname(output_filename)
+    if output_dir and not os.path.exists(output_dir):
+        os.makedirs(output_dir, exist_ok=True)
+        print(f"Created directory: {output_dir}")
+  
     # Get size from first figure
     fig_size = fig_list[0].get_size_inches()
     original_frames = len(fig_list)
@@ -121,7 +129,7 @@ if __name__ == "__main__":
     figs = []   
     # 生成測試用的 figures
     print("\nGenerating test figures...")
-    for i in range(200):
+    for i in range(50):
         fig, ax = plt.subplots(figsize=(6, 5))
         x = np.linspace(0, 2*np.pi, 100)
         y = np.sin(x + i*0.2)
