@@ -1,5 +1,5 @@
 #!/bin/bash
-#2025-10-10 YakultSmoothie
+#2025-10-14 YakultSmoothie
 
 # GitHub repository的base URL
 base_url="https://raw.githubusercontent.com/YakultSmoothie/PY_No_MoNo/refs/heads/main/"
@@ -13,12 +13,20 @@ fi
 
 # 下載所有指定的檔案
 for filename in "$@"; do
+    # 若檔案已存在，先備份
+    if [[ -f "${filename}" ]]; then
+        backup_name="${filename}.back_$(date +%Y%m%d_%H%M%S)"
+        mv "${filename}" "${backup_name}"
+        echo "⚙ 已備份舊檔案：${backup_name}"
+    fi
+
     echo "正在下載: ${filename}"
     wget -O ${filename} ${base_url}${filename}
     
     # 檢查下載是否成功
     if [ $? -eq 0 ]; then
         echo "✓ ${filename} 檔案存在"
+        chmod 755 ${filename}
     else
         echo "✗ ${filename} 檔案不存在"
     fi
