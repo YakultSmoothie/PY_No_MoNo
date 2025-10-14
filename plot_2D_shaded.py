@@ -1,21 +1,21 @@
 #--------------------------------------------
 # 視覺化一個輸入陣列
 #--------------------------------------------
-def plot_2D_shaded(array, x=None, y=None, annotation=True,
+def plot_2D_shaded(array, x=None, y=None, annotation=False,
                    levels=None, cmap='viridis', levels_norm=None,
 
                    colorbar=True, colorbar_location='right',      
                    colorbar_ticks=None, colorbar_label=None,                 
                    colorbar_offset=0,           
                    colorbar_fraction_offset=0,     
-                   colorbar_shrink_offset=1.0,       
+                   colorbar_shrink_offset=0.8,       
                    colorbar_aspect_offset=1.0,     
 
-                   figsize=(6, 5), o=None, title=None, title_loc='left',
+                   figsize=(6, 5), o=None, title=" ", title_loc='left',
                    system_time=False,
                    user_info=None,  # 可以是字串或字串列表
                    user_info_loc='upper right',  # 位置選項: 'upper/lower' + 'left/right'
-                   user_info_fontsize=5,
+                   user_info_fontsize=6,
                    user_info_offset=(0.00, 0.00),
                    
                    projection=None, transform=None, 
@@ -29,7 +29,7 @@ def plot_2D_shaded(array, x=None, y=None, annotation=True,
                    xaxis_DateFormatter=None, yaxis_DateFormatter=None,
 
                    vx=None, vy=None, vc1='black', vc2='lightblue', 
-                   vwidth=6, vlinewidth=0.4, vscale=None, vskip=None,
+                   vwidth=6, vlinewidth=0.6, vscale=None, vskip=None,
                    vref=None, vunit=None, vkey_offset=(0.00, 0.00),
                    vx_bai=None, vy_bai=None, vkey_labelpos='N',
                    color_quiverkey=None,
@@ -62,7 +62,7 @@ def plot_2D_shaded(array, x=None, y=None, annotation=True,
                  colorbar_ticks=np.logspace(-17, 17, 18),
         cmap (str): 使用的色彩映射名稱，預設'viridis'
             常用選項：turbo, jet, RdBu_r, seismic, BrBG
-        annotation (bool): 是否顯示統計數據註釋(panel的左下角)，預設True
+        annotation (bool): 是否顯示統計數據註釋(panel的左下角)，預設
 
     ============ Colorbar 參數說明 ============
         colorbar (bool): 是否繪製 colorbar（預設：True）
@@ -71,7 +71,7 @@ def plot_2D_shaded(array, x=None, y=None, annotation=True,
             - 自動設定對應的 orientation (vertical/horizontal)
         colorbar_offset (pad): colorbar 與 Axes 之間的間距（預設：0）
            - 正值推離圖表，負值拉近圖表
-        colorbar_shrink_offset: colorbar 長度的縮放倍率（預設：1.0）
+        colorbar_shrink_offset: colorbar 長度的縮放倍率（預設：0.8）
            - >1 加長，<1 縮短
            - 影響 colorbar 沿著主軸方向（vertical時為高度，horizontal時為寬度）的長度
         colorbar_aspect_offset: colorbar 寬度（粗細）的調整倍率（預設：1.0）           
@@ -94,7 +94,7 @@ def plot_2D_shaded(array, x=None, y=None, annotation=True,
       4. 最後調整 pad 控制間距
 
     === 標註與軸參數 ===
-        title (str): 圖形標題
+        title (str): 圖形標題，預設' '. set none do not draw title.
         title_loc (str): 標題定位，預設'left'
         xlabel (str): x軸標籤
         ylabel (str): y軸標籤
@@ -208,7 +208,7 @@ def plot_2D_shaded(array, x=None, y=None, annotation=True,
         vc2 (str): 向量邊界顏色，預設'lightblue'        
         vwidth (float): 向量寬度，預設6
             注意：程式內自動除以1000，實際寬度為0.006        
-        vlinewidth (float): 向量邊界線寬，預設0.4        
+        vlinewidth (float): 向量邊界線寬，預設0.6        
         vscale (float): 向量縮放比例，若為None則自動設為max_wind_speed*4
             數值越大，箭頭越短        
         vskip (tuple): 向量跳點設定(skip_x, skip_y)
@@ -232,8 +232,9 @@ def plot_2D_shaded(array, x=None, y=None, annotation=True,
         clevels (tuple or list of tuple): (細線levels, 粗線levels)，若為None則自動生成
             - None: 自動生成，預設每4條細線畫一次粗線
             - tuple: 單組等值線的levels設定
-            - list of tuple: 多組等值線各自的levels設定
-            例如：([990, 992, 994, ...], [992, 1000, 1008, ...])        
+            - a list of tuples of two lists of contour levels: 多組等值線各自的levels設定. Note: 這是一個三層結構.
+            例如：clevels=[([990, 992, 994, ...], [990, 998, 1006, ...]), ([0, 1, 2, ...], [0, 5, 10, ...])]
+            例如：clevels=[([0], [0])]
         cints (tuple or list of tuple): (細線間隔, 粗線間隔)，預設None
             當使用者只提供間隔而非完整levels時，自動計算等值線levels
             - tuple: 單組等值線的間隔，例如：(5, 20)表示細線每5畫一條，粗線每20畫一條
@@ -284,6 +285,7 @@ def plot_2D_shaded(array, x=None, y=None, annotation=True,
             例如：(-0.10, 0.00)表示向左移動10%，垂直位置不變      
         user_info_fontsize (int): 使用者資訊的字體大小，預設5        
 
+    v1.9.1 2025-10-14 調整多個預設參數
     v1.9 2025-10-12 增加多組等值線繪製功能
                         Colorbar 控制系統重構
                         - 新增 colorbar_offset: 控制 colorbar 與圖表間距（加法）
@@ -657,7 +659,7 @@ def plot_2D_shaded(array, x=None, y=None, annotation=True,
                horizontalalignment='left',
                verticalalignment='bottom',
                transform=ax.transAxes,
-               fontsize=5, alpha=1.0,
+               fontsize=6, alpha=1.0,
                zorder=90,
                bbox=dict(facecolor='white', alpha=0.8, edgecolor='gray', boxstyle='round,pad=0.5'))
         
@@ -888,16 +890,22 @@ def plot_2D_shaded(array, x=None, y=None, annotation=True,
                 print(f"{ind2}        NaN值數量:    {vec_nan_count} / {wind_speed.size} ({vec_nan_percent:.2f}%)")
             
             # 自動設定scale（如果沒有提供）
-            if vscale is None:
-                vscale = vec_max * 4
+            if vscale is None:                
+                vscale = float(f"{vec_max * 4:.3g}")  # 取兩位有效數字
                 if not silent:
                     print(f"{ind2}    自動設定vscale: {vscale:.3g}")
+            else:
+                if not silent:
+                    print(f"{ind2}    使用者輸入vscale: {vscale}")
             
             # 自動設定參考長度（如果沒有提供）
             if vref is None:
                 vref = float(f"{vec_max:.2g}")  # 取兩位有效數字
                 if not silent:
                     print(f"{ind2}    自動設定vref: {vref:.2g}")
+            else:
+                if not silent:
+                    print(f"{ind2}    使用者輸入vref: {vref}")
         else:
             if not silent:
                 print(f"{ind2}    !! 向量場無有效數據 !!")
@@ -969,18 +977,23 @@ def plot_2D_shaded(array, x=None, y=None, annotation=True,
         stats['quiver'] = qu
 
         # 添加quiverkey，位置為(1.05, 1.03) + offset
-        qk_x = 1.05 + vkey_offset[0]
-        qk_y = 1.03 + vkey_offset[1]
+        qk_x = 1.06 + vkey_offset[0]
+        qk_y = 1.01 + vkey_offset[1]
+
+        if vector_unit == "unknown":
+            vector_unit_str = ""
+        else:
+            vector_unit_str = f"[{vector_unit}]"
       
         # 根據倍率情況決定quiverkey的文字標籤
         if vx_bai is None and vy_bai is None:
-            label_text = f'{vref:.2g} [{vector_unit}]'
+            label_text = f'{vref:.2g} {vector_unit_str}'
         elif vx_bai is not None and vy_bai is None:
-            label_text = f'{vref:.2g} [{vector_unit}]\n(horizontal ×{vx_bai})'
+            label_text = f'{vref:.2g} {vector_unit_str}\n(horizontal ×{vx_bai})'
         elif vx_bai is None and vy_bai is not None:
-            label_text = f'{vref:.2g} [{vector_unit}]\n(vertical ×{vy_bai})'
+            label_text = f'{vref:.2g} {vector_unit_str}\n(vertical ×{vy_bai})'
         else:
-            label_text = f'{vref:.2g} [{vector_unit}]\n(h ×{vx_bai}, v ×{vy_bai})'
+            label_text = f'{vref:.2g} {vector_unit_str}\n(h ×{vx_bai}, v ×{vy_bai})'
         
         # auto labelcolor
         if color_quiverkey is None:
@@ -1033,6 +1046,7 @@ def plot_2D_shaded(array, x=None, y=None, annotation=True,
                         return [param] * n
                 else:
                     # 其他參數（cwidth, clab, ctype等）需要檢查嵌套
+                    #print(param_name, ": ", param, ', ', len(param), isinstance(param[0], (list, tuple)))
                     if (len(param) > 0 and isinstance(param[0], (list, tuple))):
                         # 多組設定
                         if len(param) != n:
