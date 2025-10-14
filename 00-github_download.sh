@@ -17,6 +17,7 @@ for filename in "$@"; do
     if [[ -f "${filename}" ]]; then
         backup_name="${filename}.back_$(date +%Y%m%d_%H%M%S)"
         mv "${filename}" "${backup_name}"
+        chmod 644 "${backup_name}"
         echo "⚙ 已備份舊檔案：${backup_name}"
     fi
 
