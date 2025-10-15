@@ -8,15 +8,17 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
                    colorbar_ticks=None, colorbar_label=None,                 
                    colorbar_offset=0,           
                    colorbar_fraction_offset=0,     
-                   colorbar_shrink_offset=0.8,       
-                   colorbar_aspect_offset=1.0,     
+                   colorbar_shrink_bai=0.8,       
+                   colorbar_aspect_bai=1.0,     
 
-                   figsize=(6, 5), o=None, title=" ", title_loc='left',
-                   system_time=False,
+                   figsize=(6, 5), o=None,
+                   title=" ", title_loc='left',
                    user_info=None,  # 可以是字串或字串列表
                    user_info_loc='upper right',  # 位置選項: 'upper/lower' + 'left/right'
                    user_info_fontsize=6,
                    user_info_offset=(0.00, 0.00),
+                   user_info_color='black',
+                   system_time=False,
                    
                    projection=None, transform=None, 
                    xlabel=None, ylabel=None, indent=0, 
@@ -55,11 +57,14 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
         
     === 圖形樣式參數 ===
         levels (list): 等值線/色階的值，如果為None則自動產生
-            例如：np.linspace(-20, 20, 11)        
+            例1：np.linspace(-20, 20, 11)    # 均勻分布：-20到20之間11個等級      
+            例2：np.arange(-20, 21, 2)       # 固定間隔2單位：每2單位一個等級      
+            例3：np.logspace(-10, 10, 11)    # 對數尺度
+            例4：np.array([0, 0.5, 1, 5, 30])# 不等間隔
         levels_norm: 用來控制數值到色彩的映射關係，（預設：None）
             例如：levels=np.logspace(-17, 17, 18),
-                 levels_norm=LogNorm(vmin=1e-17, vmax=1e17),
-                 colorbar_ticks=np.logspace(-17, 17, 18),
+                  levels_norm=LogNorm(vmin=1e-17, vmax=1e17),
+                  colorbar_ticks=np.logspace(-17, 17, 18),
         cmap (str): 使用的色彩映射名稱，預設'viridis'
             常用選項：turbo, jet, RdBu_r, seismic, BrBG
         annotation (bool): 是否顯示統計數據註釋(panel的左下角)，預設
@@ -71,18 +76,19 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
             - 自動設定對應的 orientation (vertical/horizontal)
         colorbar_offset (pad): colorbar 與 Axes 之間的間距（預設：0）
            - 正值推離圖表，負值拉近圖表
-        colorbar_shrink_offset: colorbar 長度的縮放倍率（預設：0.8）
+        colorbar_shrink_bai: colorbar 長度的縮放倍率（預設：0.8）
            - >1 加長，<1 縮短
            - 影響 colorbar 沿著主軸方向（vertical時為高度，horizontal時為寬度）的長度
-        colorbar_aspect_offset: colorbar 寬度（粗細）的調整倍率（預設：1.0）           
+        colorbar_aspect_bai: colorbar 寬度（粗細）的調整倍率（預設：1.0）           
            - >1 變寬（變粗），<1 變細           
         colorbar_fraction_offset: 預留給 colorbar 的空間比例調整（預設：0）
            - 當空間不足時，shrink 與 aspect 的調整效果會受限，colorbar 可能出現非預期變形
            - 此時需增加 fraction 提供更多空間
         colorbar_label (str or None): colorbar 的標籤文字（預設：None）
-           - 若指定字串，使用該字串作為標籤
            - 若為 None 且數據有單位屬性，自動使用 '[單位]' 格式
-           - 若為 None 且數據無單位，不顯示標籤
+           - 若為 None 且數據無單位，自動不顯示標籤
+           - 若為 'no', 'nolabel', ' '，強制不顯示標籤
+           - 若為字串，使用該字串作為標籤
         colorbar_ticks (list or None): colorbar 上標示刻度的位置（預設：None）
            - 明確指定要顯示哪些數值的刻度
            - 例如：np.linspace(-20, 20, 11) 會在 -20 到 20 之間均勻產生 11 個刻度
@@ -285,12 +291,14 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
             例如：(-0.10, 0.00)表示向左移動10%，垂直位置不變      
         user_info_fontsize (int): 使用者資訊的字體大小，預設5        
 
+    v1.9.2 2025-10-15 colorbar參數重新命名
+                      調整colorbar與vector的單位輸出
     v1.9.1 2025-10-14 調整多個預設參數
     v1.9 2025-10-12 增加多組等值線繪製功能
                         Colorbar 控制系統重構
                         - 新增 colorbar_offset: 控制 colorbar 與圖表間距（加法）
-                        - 新增 colorbar_shrink_offset: 控制 colorbar 長度（乘法倍率）
-                        - 新增 colorbar_aspect_offset: 控制 colorbar 粗細（除法倍率，越大越寬）
+                        - 新增 colorbar_shrink_bai: 控制 colorbar 長度（乘法倍率）
+                        - 新增 colorbar_aspect_bai: 控制 colorbar 粗細（除法倍率，越大越寬）
                         - 新增 colorbar_fraction_offset: 控制預留空間比例（加法）
                         - 新增 colorbar_ticks: 可明確指定刻度位置
                         - aspect 自動隨 shrink 等比縮放以保持寬度一致
@@ -300,7 +308,7 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
                     支援cnt輸入為list，可同時繪製多組等值線
                         - cnt: 可設定[vars, hgt_ea_ds_smoothed] 多變數
                         - ccolor: 可設定['magenta', 'blue']為每組指定顏色
-                        - clevels: 可設定[(levels1_thin, levels1_thick), (levels2_thin, levels2_thick), ...]
+                        - clevels: 可設定[(levels1_thin_list, levels1_thick_list), (levels2_thin_list, levels2_thick_list), ...]
                         - cints: 可設定[(5, 20), (10, 40), ...]為每組指定間隔
                         - cwidth: 可設定[(0.8, 2.0), (1.0, 2.5), ...]為每組指定線寬
                         - ctype: 可設定[('-', '-'), ('--', '--'), ...]為每組指定正值線型
@@ -376,13 +384,13 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
     # 檢查 xarray.DataArray.data 是否為 pint Quantity
     if hasattr(array, 'data') and hasattr(array.data, 'units'):
         has_units = True
-        unit_str = str(array.data.units)
+        unit_str = f"{array.data.units:~}"
         if not silent:
             print(f"{ind}檢測到shaded xarray DataArray，其.data為pint Quantity, 單位: {unit_str}")
     # 檢查 xarray 本身是否為 pint Quantity
     elif hasattr(array, 'units') and hasattr(array, 'magnitude'):
-        has_units = True
-        unit_str = str(array.units)
+        has_units = True        
+        unit_str = f"{array.units:~}"
         if not silent:
             print(f"{ind}檢測到pint Quantity, 單位: {unit_str}")
     # 檢查 xarray 是否有 units 屬性
@@ -464,7 +472,6 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
     stats['valid_percent'] = valid_percent = 100 - nan_percent
     
     if not silent:
-        print(f"{ind2}NaN值分析:")
         print(f"{ind2}    NaN值數量:    {nan_count} / {rows * cols} ({nan_percent:.2f}%)")
     
     # 自動生成color等值線範圍(如果沒有提供)
@@ -476,13 +483,13 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
         else:
             levels = np.linspace(data_min, data_max, 11)  # 默認範圍
     
-    # 設置colormap, 讓NaN值顯示為黑色
-    if not silent:
-        print(f"{ind2}繪圖設定:")
-        print(f"{ind2}    使用色彩映射: {cmap}")
-        if levels is not None:
-            print(f"{ind2}    色彩等值線層級數: {len(levels)}")
-            print(f"{ind2}    色彩等值線範圍:   {levels[0]} - {levels[-1]}")
+    # 設置colormap
+    #if not silent:
+    #    print(f"{ind2}繪圖設定:")
+    #    print(f"{ind2}    使用色彩映射: {cmap}")
+    #    if levels is not None:
+    #        print(f"{ind2}    色彩等值線層級數: {len(levels)}")
+    #        print(f"{ind2}    色彩等值線範圍:   {levels[0]} - {levels[-1]}")
 
     # 創建圖形
     print(f"{ind2}創建圖形:")
@@ -516,22 +523,22 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
     #    ax.set_facecolor(background_color)  
       
     
-    print(f"{ind2}創建網格數據:")
+    print(f"{ind2}    創建網格數據:")
     # 創建網格數據
     if x is None and y is None:
         # 沒有提供經緯度,使用索引
-        print(f"{ind2}    create XX and YY by np.meshgrid(np.arange(cols), np.arange(rows)")
+        print(f"{ind2}        create XX and YY by np.meshgrid(np.arange(cols), np.arange(rows)")
         XX, YY = np.meshgrid(np.arange(cols), np.arange(rows))
     elif x is not None and y is not None:
-        print(f"{ind2}    create XX and YY from input x and y")
+        print(f"{ind2}        create XX and YY from input x and y")
         # 處理xarray DataArray
         if hasattr(x, 'values'):
             if not silent:
-                print(f"{ind2}    檢測到x為xarray DataArray, 自動提取.values")
+                print(f"{ind2}        檢測到x為xarray DataArray, 自動提取.values")
             x = x.values
         if hasattr(y, 'values'):
             if not silent:
-                print(f"{ind2}    檢測到y為xarray DataArray, 自動提取.values")
+                print(f"{ind2}        檢測到y為xarray DataArray, 自動提取.values")
             y = y.values
         
         # 檢查經緯度維度
@@ -551,9 +558,10 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
         raise ValueError(f"{ind2}    x和y必須同時提供或同時為None")
     
     # 繪製等值線填充圖
-    print(f"{ind2}繪製色彩等值線圖:")
+    print(f"{ind2}色彩等值線圖繪製:")
     masked_array = np.ma.masked_invalid(array)
     cmap_obj = colormaps.get_cmap(cmap)
+    print(f"{ind2}    使用色彩映射: {cmap}")
     if len(levels) <= 15:
         print(f"{ind2}    contourf levels: {levels}")
     else:
@@ -586,7 +594,7 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
 
     # ============ 添加色條 ============
     if colorbar:
-        print(f"{ind2}colorbar設定:")
+        print(f"{ind2}    colorbar設定:")
         
         # 1. 決定orientation和pad0        
         if colorbar_location in ['right', 'left']:
@@ -602,19 +610,19 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
             colorbar_shrink_base = 1.0
             aspect_base = 20  # 基礎aspect值                
         if not silent:
-            print(f"{ind2}    自動設定orientation: {colorbar_orientation} (location={colorbar_location})")   
+            print(f"{ind2}        orientation: {colorbar_orientation} (location={colorbar_location})")   
         
         # 2. 計算實際pad
         pad_actual = pad0 + colorbar_offset                   
-        colorbar_shrink = colorbar_shrink_base * colorbar_shrink_offset
+        colorbar_shrink = colorbar_shrink_base * colorbar_shrink_bai
         colorbar_fraction = colorbar_fraction_base + colorbar_fraction_offset
-        colorbar_aspect = aspect_base * (colorbar_shrink / colorbar_shrink_base) * (1 / colorbar_aspect_offset)
-        
-        if not silent:            
-            print(f"{ind2}    pad: base={pad0}, offset= + {colorbar_offset}, final={pad_actual}")
-            print(f"{ind2}    fraction: base={colorbar_fraction_base}, offset= + {colorbar_fraction_offset}, final={colorbar_fraction}")
-            print(f"{ind2}    shrink: base={colorbar_shrink_base}, offset(倍率)= * {colorbar_shrink_offset}, final={colorbar_shrink}")
-            print(f"{ind2}    aspect: base={aspect_base}, offset(倍率)= * {colorbar_shrink/colorbar_shrink_base} / {colorbar_aspect_offset:.2f}, final={colorbar_aspect:.2f}")
+        colorbar_aspect = aspect_base * (colorbar_shrink / colorbar_shrink_base) * (1 / colorbar_aspect_bai)
+      
+        if not silent:                        
+            print(f"{ind2}        pad: {colorbar_offset} (offset) + {pad0} (base) = {pad_actual} (final)")
+            print(f"{ind2}        fraction: {colorbar_fraction_offset} (offset) + {colorbar_fraction_base} (base) = {colorbar_fraction} (final)")        
+            print(f"{ind2}        shrink: {colorbar_shrink_bai} (bai) * {colorbar_shrink_bai} (base) = {colorbar_shrink} (final)")
+            print(f"{ind2}        aspect: 1/{colorbar_aspect_bai:.2f} (1/bai) * {colorbar_shrink/colorbar_shrink_base} (shrink/base) = {colorbar_aspect:.2f} (final)")
                     
         # 4. 繪製colorbar
         cbar = plt.colorbar(cf, ax=ax,
@@ -635,18 +643,22 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
         # 5. 設定colorbar標籤
         if colorbar_label is not None:
             # 使用者指定的標籤
-            cbar.set_label(colorbar_label, fontsize=10)
-            if not silent:
-                print(f"{ind2}    使用指定colorbar_label: {colorbar_label}")
+            if colorbar_label in ['', ' ', 'nolabel', 'None', 'no']:
+                if not silent:
+                    print(f"{ind2}        使用者自訂colorbar_label: nolabel")
+            else:
+                cbar.set_label(colorbar_label, fontsize=10)
+                if not silent:
+                    print(f"{ind2}        使用者自訂colorbar_label: {colorbar_label}")
         elif has_units:
             # 自動從數據中提取單位
             auto_label = f'[{unit_str}]'
             cbar.set_label(auto_label, fontsize=10)
             if not silent:
-                print(f"{ind2}    自動設定colorbar_label: {auto_label}")
+                print(f"{ind2}        自動設定colorbar_label: {auto_label}")
         else:
             if not silent:
-                print(f"{ind2}    無colorbar_label設定")
+                print(f"{ind2    }    自動設定colorbar_label: 未發現單位，不顯示colorbar_label")
     
     # 添加統計信息在圖的左下角
     ng = 3
@@ -980,7 +992,7 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
         qk_x = 1.06 + vkey_offset[0]
         qk_y = 1.01 + vkey_offset[1]
 
-        if vector_unit == "unknown":
+        if vector_unit == "unknown" or vunit in ["None", "nolabel", "no", " ", ""]:
             vector_unit_str = ""
         else:
             vector_unit_str = f"[{vector_unit}]"
@@ -1279,11 +1291,15 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
         # 根據位置參數決定座標
         loc_dict = {
             'upper right': (1.00, 1.01, 'right', 'bottom'),
+            'top right':   (1.00, 1.01, 'right', 'bottom'),
             'upper left': (-0.02, 1.04, 'right', 'bottom'),
-            'lower right': (1.03, -0.05, 'left', 'top'),
-            'lower left': (0.00, -0.10, 'left', 'top'),
-        }
-        
+            'top left':   (-0.02, 1.04, 'right', 'bottom'),
+
+            'lower right':  (1.03, -0.05, 'left', 'top'),
+            'bottom right': (1.03, -0.05, 'left', 'top'),
+            'lower left':  (0.00, -0.10, 'left', 'top'),
+            'bottom left': (0.00, -0.10, 'left', 'top'),
+        }        
         if user_info_loc not in loc_dict:
             user_info_loc = 'upper right'
         x_pos, y_pos, ha, va = loc_dict[user_info_loc]    
@@ -1297,6 +1313,7 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
                verticalalignment=va,
                transform=ax.transAxes,
                fontsize=user_info_fontsize,
+               color=user_info_color,
                alpha=1.0,
                zorder=95)
         
@@ -1320,3 +1337,5 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
     
     # 返回圖形對象和統計資訊
     return fig, ax, stats, XX, YY
+
+
