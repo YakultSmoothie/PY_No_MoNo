@@ -21,7 +21,7 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
                    system_time=False,
                    
                    projection=None, transform=None, 
-                   xlabel=None, ylabel=None, indent=0, 
+                   xlabel=" ", ylabel=" ", indent=0, 
 
                    coastline_color=('yellow', 'black'), coastline_width=(1.7, 1.5), coastline_resolution='50m',
                    grid=True, grid_type=None, 
@@ -100,10 +100,10 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
       4. 最後調整 pad 控制間距
 
     === 標註與軸參數 ===
-        title (str): 圖形標題，預設' '. set none do not draw title.
+        title (str): 圖形標題，預設' '. set None do not draw title.
         title_loc (str): 標題定位，預設'left'
-        xlabel (str): x軸標籤
-        ylabel (str): y軸標籤
+        xlabel (str): x軸標籤， 預設' '
+        ylabel (str): y軸標籤， 預設' '
         indent (int): 終端輸出縮排空格數，預設0
         
     === 投影與座標系統 ===
@@ -291,6 +291,7 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
             例如：(-0.10, 0.00)表示向左移動10%，垂直位置不變      
         user_info_fontsize (int): 使用者資訊的字體大小，預設5        
 
+    v1.9.3 2025-10-16 調整多個預設參數
     v1.9.2 2025-10-15 colorbar參數重新命名
                       調整colorbar與vector的單位輸出
     v1.9.1 2025-10-14 調整多個預設參數
@@ -586,11 +587,11 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
     
     # 添加標題和軸標籤    
     if title:
-        ax.set_title(title, fontsize=10, pad=9, fontweight='bold', loc=title_loc)
+        ax.set_title(title, fontsize=12, pad=9, fontweight='bold', loc=title_loc)
     if xlabel:
-        ax.set_xlabel(xlabel, fontsize=10)
+        ax.set_xlabel(xlabel, fontsize=10, fontweight='bold')
     if ylabel:
-        ax.set_ylabel(ylabel, fontsize=10)
+        ax.set_ylabel(ylabel, fontsize=10, fontweight='bold')
 
     # ============ 添加色條 ============
     if colorbar:
@@ -1267,16 +1268,17 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
     # ============ 系統時間標註 ============
     if system_time:
         from datetime import datetime
-        current_time = datetime.now().strftime('%Y-%m-%d\n%H:%M:%S')
+        current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         # 使用 fig.text 在 figure 座標系統中標註
         # 位置 (0.01, 0.01) 表示左下角,略微偏移避免貼邊
-        fig.text(0.00, -0.03, f'Created:\n{current_time}', 
+        system_time_str = f'Created:{current_time}'
+        fig.text(0.01, -0.02, system_time_str, 
                 fontsize=5, color='black', alpha=1.0,
                 ha='left', va='top',
                 transform=fig.transFigure,
                 zorder=100)
         if not silent:
-            print(f"{ind2}系統時間標註: {current_time}")
+            print(f"{ind2}系統時間標註: {system_time_str}")
 
     # ============ 使用者資訊標註 ============
     if user_info is not None:
