@@ -9,7 +9,7 @@
 | def_show_array_info<br>`array_info(data[,...])` | Display comprehensive array information | [GitHub](https://github.com/YakultSmoothie/PY_No_MoNo/blob/main/def_show_array_info.py) |
 | `quantity_to_xarray(quantity, template[, name, description])` | Convert pint Quantity to xarray DataArray with unit preservation | [GitHub](https://github.com/YakultSmoothie/PY_No_MoNo/blob/main/def_quantity_to_xarray.py) |
 | **Spatial Analysis** |
-| custom_cross_section(data, start, end, lons, lats[, ...]) | Extract cross-section from lon-lat coordinate grid data (e.g., WRF, ERA5). <br>Supports multi-dimensional data and unit preservation. | [GitHub] (https://github.com/YakultSmoothie/PY_No_MoNo/blob/main/def_custom_cross_section.py) |
+| custom_cross_section(data, start, end, lons, lats[, ...]) | Extract cross-section from lon-lat coordinate grid data (e.g., WRF, ERA5). <br>Supports multi-dimensional data and unit preservation. | [GitHub](https://github.com/YakultSmoothie/PY_No_MoNo/blob/main/def_custom_cross_section.py) |
 
 
 ## Tool
