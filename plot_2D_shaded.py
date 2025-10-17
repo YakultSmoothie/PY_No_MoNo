@@ -9,7 +9,7 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
                    colorbar_offset=0,           
                    colorbar_fraction_offset=0,     
                    colorbar_shrink_bai=0.8,       
-                   colorbar_aspect_bai=1.0,     
+                   colorbar_aspect_bai=0.9,     
 
                    figsize=(6, 5), o=None,
                    title=" ", title_loc='left',
@@ -79,7 +79,7 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
         colorbar_shrink_bai: colorbar 長度的縮放倍率（預設：0.8）
            - >1 加長，<1 縮短
            - 影響 colorbar 沿著主軸方向（vertical時為高度，horizontal時為寬度）的長度
-        colorbar_aspect_bai: colorbar 寬度（粗細）的調整倍率（預設：1.0）           
+        colorbar_aspect_bai: colorbar 寬度（粗細）的調整倍率（預設：0.8）           
            - >1 變寬（變粗），<1 變細           
         colorbar_fraction_offset: 預留給 colorbar 的空間比例調整（預設：0）
            - 當空間不足時，shrink 與 aspect 的調整效果會受限，colorbar 可能出現非預期變形
@@ -291,7 +291,7 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
             例如：(-0.10, 0.00)表示向左移動10%，垂直位置不變      
         user_info_fontsize (int): 使用者資訊的字體大小，預設5        
 
-    v1.9.3 2025-10-16 調整多個預設參數
+    v1.9.3 2025-10-17 調整多個預設參數
     v1.9.2 2025-10-15 colorbar參數重新命名
                       調整colorbar與vector的單位輸出
     v1.9.1 2025-10-14 調整多個預設參數
@@ -599,7 +599,7 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
         
         # 1. 決定orientation和pad0        
         if colorbar_location in ['right', 'left']:
-            pad0 = 0.03
+            pad0 = 0.02
             colorbar_orientation = 'vertical'
             colorbar_fraction_base = 0.10
             colorbar_shrink_base = 1.0
@@ -904,7 +904,7 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
             
             # 自動設定scale（如果沒有提供）
             if vscale is None:                
-                vscale = float(f"{vec_max * 4:.3g}")  # 取兩位有效數字
+                vscale = float(f"{vec_max * 4:.3g}")  # 取3位有效數字
                 if not silent:
                     print(f"{ind2}    自動設定vscale: {vscale:.3g}")
             else:
@@ -990,23 +990,26 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
         stats['quiver'] = qu
 
         # 添加quiverkey，位置為(1.05, 1.03) + offset
-        qk_x = 1.06 + vkey_offset[0]
-        qk_y = 1.01 + vkey_offset[1]
+        qk_x = 1.07 + vkey_offset[0]
+        qk_y = 0.98 + vkey_offset[1]
 
         if vector_unit == "unknown" or vunit in ["None", "nolabel", "no", " ", ""]:
-            vector_unit_str = ""
+            vector_unit_str = " "
         else:
-            vector_unit_str = f"[{vector_unit}]"
+            if vunit is not None:
+                vector_unit_str = vunit
+            else:
+                vector_unit_str = f"[{vector_unit}]"
       
         # 根據倍率情況決定quiverkey的文字標籤
         if vx_bai is None and vy_bai is None:
-            label_text = f'{vref:.2g} {vector_unit_str}'
+            label_text = f'{vector_unit_str}\n{vref}'
         elif vx_bai is not None and vy_bai is None:
-            label_text = f'{vref:.2g} {vector_unit_str}\n(horizontal ×{vx_bai})'
+            label_text = f'(h ×{vx_bai})\n{vector_unit_str}\n{vref}'
         elif vx_bai is None and vy_bai is not None:
-            label_text = f'{vref:.2g} {vector_unit_str}\n(vertical ×{vy_bai})'
+            label_text = f'(v ×{vy_bai})\n{vector_unit_str}\n{vref}'
         else:
-            label_text = f'{vref:.2g} {vector_unit_str}\n(h ×{vx_bai}, v ×{vy_bai})'
+            label_text = f'(h ×{vx_bai}, v ×{vy_bai})\n{vector_unit_str}\n{vref}'
         
         # auto labelcolor
         if color_quiverkey is None:
@@ -1320,7 +1323,8 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
                zorder=95)
         
         if not silent:
-            print(f"{ind2}使用者資訊標註於: {user_info_loc}\n{info_text}")
+            print(f"{ind2}使用者資訊標註於: {user_info_loc}")
+            print(f"{ind2}    使用者資訊: {info_text}")
 
     # ============ After Draw ============
     if show:
