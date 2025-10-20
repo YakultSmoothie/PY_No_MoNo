@@ -671,7 +671,7 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
         stats_text1 = f"mean={stats['mean']:.{ng}g}, std={stats['std']:.{ng}g}"
         stats_text2 = f"min={stats['min']:.{ng}g}, max={stats['max']:.{ng}g}"
         stats_text3 = f"Q1={stats['q1']:.{ng}g}, Q2={stats['q2']:.{ng}g}, Q3={stats['q3']:.{ng}g}"
-        ax.text(0.03, 0.03, stats_text0 + "\n" + stats_text1 + "\n" + stats_text2 + "\n" + stats_text3,
+        ax.text(0.00, 0.00, stats_text0 + "\n" + stats_text1 + "\n" + stats_text2 + "\n" + stats_text3,
                horizontalalignment='left',
                verticalalignment='bottom',
                transform=ax.transAxes,
