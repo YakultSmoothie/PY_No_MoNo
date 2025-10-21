@@ -23,13 +23,15 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
                    system_time_info=None,
                    
                    projection=None, transform=None, 
+                   aspect_ratio=None,  # 新增：控制圖形長寬比，例如 (1.5, 1) 或 1.5
                    xlabel=" ", ylabel=" ", indent=0, 
 
                    coastline_color=('yellow', 'black'), coastline_width=(1.7, 1.5), coastline_resolution='50m',
-                   grid=True, grid_type=None, 
-                   grid_int=None, grid_xticks = None, grid_yticks = None, grid_xticks_labels = None, grid_yticks_labels = None,
-                   grid_linestyle=':', grid_linewidth=1.5, grid_alpha = 0.6, grid_zordwr = 9, grid_color = 'gray',
-                   gxylim=None,
+                   grid=True, grid_type=None, grid_int=None, 
+                   grid_xticks = None, grid_yticks = None, 
+                   grid_xticks_labels = None, grid_yticks_labels = None,
+                   grid_linestyle=':', grid_linewidth=1.5, grid_alpha = 0.6, 
+                   grid_zordwr = 9, grid_color = 'gray', gxylim=None,
                    xaxis_DateFormatter=None, yaxis_DateFormatter=None,
 
                    vx=None, vy=None, vc1='black', vc2='lightblue', 
@@ -116,6 +118,12 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
                 ncfile = nc.Dataset(f"/path/wrfinput_d02")
                 hgt = wrf.getvar(ncfile, "HGT") 
                 proj = wrf.get_cartopy(hgt)
+        aspect_ratio (float, tuple or None): 控制圖形顯示的長寬比，預設None
+            - None: 使用matplotlib預設的aspect設定（'auto'）
+            - float: 單一數值，表示寬高比（width/height），例如 1.5 表示寬度是高度的1.5倍
+            - tuple: (width, height) 相對比例，例如 (1.5, 1) 與輸入 1.5 效果相同
+            - 'equal': 強制x和y軸使用相同的單位長度
+            注意：調整aspect ratio會改變圖形的視覺呈現，但不影響數據座標範圍
 
     === 地圖特徵參數 ===
         coastline (tuple or None): 海岸線顏色(外層, 內層)，預設('yellow', 'black')
@@ -291,8 +299,9 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
             - 用於微調使用者資訊的顯示位置，正值向右/向上移動，負值向左/向下移動
             例如：(0.05, -0.05)表示向右移動5%，向下移動5%
             例如：(-0.10, 0.00)表示向左移動10%，垂直位置不變      
-        user_info_fontsize (int): 使用者資訊的字體大小，預設5        
+        user_info_fontsize (int): 使用者資訊的字體大小，預設5       
 
+    v1.11 2025-10-21 增加aspect_ratio功能，可控制圖形長寬比
     v1.10 2025-10-20 增加system_time的功能
     v1.9.3 2025-10-17 調整多個預設參數
     v1.9.2 2025-10-15 colorbar參數重新命名
@@ -582,6 +591,27 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
                          norm=levels_norm)
     
     stats['contourf'] = cf
+
+    # ============ 設定圖形長寬比 ============
+    if aspect_ratio is not None:
+        if isinstance(aspect_ratio, (int, float)):
+            # 單一數值，直接設定
+            ax.set_aspect(aspect_ratio)
+            if not silent:
+                print(f"{ind2}設定aspect ratio: {aspect_ratio}")
+        elif isinstance(aspect_ratio, (tuple, list)) and len(aspect_ratio) == 2:
+            # tuple格式，計算比例
+            ratio = aspect_ratio[0] / aspect_ratio[1]
+            ax.set_aspect(ratio)
+            if not silent:
+                print(f"{ind2}設定aspect ratio: {aspect_ratio[0]}/{aspect_ratio[1]} = {ratio:.3f}")
+        elif aspect_ratio == 'equal':
+            ax.set_aspect('equal')
+            if not silent:
+                print(f"{ind2}設定aspect ratio: equal")
+        else:
+            if not silent:
+                print(f"{ind2}警告: aspect_ratio格式不正確，忽略此設定")
 
     # 加粗框
     for spine in ax.spines.values():
