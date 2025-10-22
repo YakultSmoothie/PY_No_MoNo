@@ -1,14 +1,16 @@
-from pathlib import Path
-import importlib
+# 在 __init__.py 中加入
+__all__ = [
+    'def_quantity_to_xarray',
+    'def_custom_cross_section', 
+    'def_show_array_info',
+    'plot_2D_shaded'
+]
 
-# 自動導入當前目錄下所有 .py 檔（除了 __init__.py）
-_current_dir = Path(__file__).parent
-for py_file in _current_dir.glob('*.py'):
-    if py_file.name != '__init__.py':
-        module_name = py_file.stem
-        module = importlib.import_module(f'.{module_name}', package=__name__)
-        globals().update({k: v for k, v in module.__dict__.items()
-                          if not k.startswith('_')})
+# 從子模組導入所有內容
+from .def_quantity_to_xarray import *
+from .def_custom_cross_section import *
+from .def_show_array_info import *
+from .plot_2D_shaded import *
 
 # 設定別名
 p2d = plot_2D_shaded
