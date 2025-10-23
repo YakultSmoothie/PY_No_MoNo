@@ -17,6 +17,7 @@ def array_info(data, var_name="Variable", indent=0, lite=False):
         - 單位資訊（如有）
         - 座標資訊(xarray專用)
 
+    v1.5 - 2025/10/23 - YakultSmoothie - 微調輸出顯示
     v1.4 - 2025/10/09 - YakultSmoothie
     v1.3 - 2025/10/01 - YakultSmoothie
     """
@@ -74,7 +75,7 @@ def array_info(data, var_name="Variable", indent=0, lite=False):
     data_shape = data.shape if hasattr(data, 'shape') else values.shape
     data_ndim = data.ndim if hasattr(data, 'ndim') else values.ndim
     data_size = data.size if hasattr(data, 'size') else values.size
-    print(f"{ind}data shape, ndim, size: {data_shape}, {data_ndim}, {data_size}")
+    print(f"{ind}data.shape | .ndim | .size: {data_shape} | {data_ndim} | {data_size}")
 
     # 如果是 xarray.DataArray，顯示維度名稱與座標資訊
     if isinstance(data, xr.DataArray):

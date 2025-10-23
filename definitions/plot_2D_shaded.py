@@ -301,6 +301,7 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
             例如：(-0.10, 0.00)表示向左移動10%，垂直位置不變      
         user_info_fontsize (int): 使用者資訊的字體大小，預設5       
 
+    v1.11.1 2025-10-23 微調輸出
     v1.11 2025-10-21 增加aspect_ratio功能，可控制圖形長寬比
     v1.10 2025-10-20 增加system_time的功能
     v1.9.3 2025-10-17 調整多個預設參數
@@ -1308,9 +1309,9 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
         # 使用 fig.text 在 figure 座標系統中標註
         # 位置 表示下角,略微偏移避免貼邊
         if system_time_info is None:
-            system_time_str = f'Created:{current_time}'
+            system_time_str = f'{current_time}'
         else:
-            system_time_str = f'Created:{current_time}\n{system_time_info}'
+            system_time_str = f'{current_time}\n{system_time_info}'
         fig.text(1.00+system_time_offset[0], 0.00+system_time_offset[1], system_time_str, 
                 fontsize=5, color='black', alpha=1.0,
                 #ha='left', va='top',
