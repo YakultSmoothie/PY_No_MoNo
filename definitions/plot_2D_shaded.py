@@ -26,7 +26,10 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
                    aspect_ratio=None,  # 新增：控制圖形長寬比，例如 (1.5, 1) 或 1.5
                    xlabel=" ", ylabel=" ", indent=0, 
 
-                   coastline_color=('yellow', 'black'), coastline_width=(1.7, 1.5), coastline_resolution='50m',
+                   coastline_color=('yellow', 'black'), 
+                   coastline_width=(1.7, 1.5), 
+                   coastline_resolution='50m',
+
                    grid=True, grid_type=None, grid_int=None, 
                    grid_xticks = None, grid_yticks = None, 
                    grid_xticks_labels = None, grid_yticks_labels = None,
@@ -34,8 +37,8 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
                    grid_zordwr = 9, grid_color = 'gray', gxylim=None,
                    xaxis_DateFormatter=None, yaxis_DateFormatter=None,
 
-                   vx=None, vy=None, vc1='black', vc2='lightblue', 
-                   vwidth=6, vlinewidth=0.6, vscale=None, vskip=None,
+                   vx=None, vy=None, vc1='black', vc2='white', 
+                   vwidth=6, vlinewidth=0.4, vscale=None, vskip=None,
                    vref=None, vunit=None, vkey_offset=(0.00, 0.00),
                    vx_bai=None, vy_bai=None, vkey_labelpos='N',
                    color_quiverkey=None,
