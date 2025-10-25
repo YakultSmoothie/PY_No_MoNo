@@ -2,7 +2,7 @@
 # 視覺化一個輸入陣列
 #--------------------------------------------
 def plot_2D_shaded(array, x=None, y=None, annotation=False,
-                   levels=None, cmap='viridis', levels_norm=None,
+                   levels=None, cmap='viridis', norm=None,
 
                    colorbar=True, colorbar_location='right',      
                    colorbar_ticks=None, colorbar_label=None,                 
@@ -34,8 +34,8 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
                    grid_zordwr = 9, grid_color = 'gray', gxylim=None,
                    xaxis_DateFormatter=None, yaxis_DateFormatter=None,
 
-                   vx=None, vy=None, vc1='black', vc2='white', 
-                   vwidth=6, vlinewidth=0.4, vscale=None, vskip=None,
+                   vx=None, vy=None, vc1='black', vc2='lightblue', 
+                   vwidth=6, vlinewidth=0.6, vscale=None, vskip=None,
                    vref=None, vunit=None, vkey_offset=(0.00, 0.00),
                    vx_bai=None, vy_bai=None, vkey_labelpos='N',
                    color_quiverkey=None,
@@ -65,9 +65,9 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
             例2：np.arange(-20, 21, 2)       # 固定間隔2單位：每2單位一個等級      
             例3：np.logspace(-10, 10, 11)    # 對數尺度
             例4：np.array([0, 0.5, 1, 5, 30])# 不等間隔
-        levels_norm: 用來控制數值到色彩的映射關係，（預設：None）
+        norm: 用來控制數值到色彩的映射關係，（預設：None）
             例如：levels=np.logspace(-17, 17, 18),
-                  levels_norm=LogNorm(vmin=1e-17, vmax=1e17),
+                  norm=LogNorm(vmin=1e-17, vmax=1e17),
                   colorbar_ticks=np.logspace(-17, 17, 18),
         cmap (str): 使用的色彩映射名稱，預設'viridis'
             常用選項：turbo, jet, RdBu_r, seismic, BrBG
@@ -301,6 +301,8 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
             例如：(-0.10, 0.00)表示向左移動10%，垂直位置不變      
         user_info_fontsize (int): 使用者資訊的字體大小，預設5       
 
+    v1.12 2025-10-25 調整參數命名
+                     增加extent_auto自動調節功能
     v1.11.1 2025-10-23 微調輸出
     v1.11 2025-10-21 增加aspect_ratio功能，可控制圖形長寬比
     v1.10 2025-10-20 增加system_time的功能
@@ -317,7 +319,7 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
                         - 新增 colorbar_ticks: 可明確指定刻度位置
                         - aspect 自動隨 shrink 等比縮放以保持寬度一致
                         - 根據 location 自動設定最佳預設值（vertical/horizontal）
-                    增加levels_norm功能   
+                    增加norm功能   
     v1.8 2025-10-11 增加多組等值線繪製功能
                     支援cnt輸入為list，可同時繪製多組等值線
                         - cnt: 可設定[vars, hgt_ea_ds_smoothed] 多變數
@@ -584,12 +586,12 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
 
     if transform is not None:
         cf = ax.contourf(XX, YY, array, levels=levels, cmap=cmap_obj, extend='both', zorder=0,
-                         norm=levels_norm, 
+                         norm=norm, 
                          transform=transform
                          )
     else:
         cf = ax.contourf(XX, YY, array, levels=levels, cmap=cmap_obj, extend='both', zorder=0,
-                         norm=levels_norm)
+                         norm=norm)
     
     stats['contourf'] = cf
 
@@ -768,6 +770,10 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
             if gxylim is not None:
                 ax.set_extent(gxylim, crs=transform)
                 print(f"{ind2}    map extent: {ax.get_extent()}")
+            else:
+                extent_auto = (XX.max(), XX.min(), YY.max(), YY.min())
+                ax.set_extent(extent_auto, crs=transform)                
+                print(f"{ind2}    auto map extent: ({extent_auto[0]:.6g}, {extent_auto[1]:.6g}, {extent_auto[2]:.6g}, {extent_auto[3]:.6g})")
 
         elif (grid_type == None and type(projection).__name__ == 'LambertConformal') or (grid_type == 2) or (grid_type == 'Lambert'):            
             print(f"{ind2}    grid type: gridlines with labels (for LambertConformal)")
@@ -819,6 +825,10 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
             if gxylim is not None:
                 ax.set_extent(gxylim, crs=transform)
                 print(f"{ind2}    map extent: {ax.get_extent()}")
+            #else:
+            #    extent_auto = (XX.max(), XX.min(), YY.max(), YY.min())
+            #    ax.set_extent(extent_auto, crs=transform)                
+            #    print(f"{ind2}    auto map extent: ({extent_auto[0]:.6g}, {extent_auto[1]:.6g}, {extent_auto[2]:.6g}, {extent_auto[3]:.6g})")
 
         elif (grid_type == None) or (grid_type == 1):
             print(f"{ind2}    grid type: basic grid (ax.grid)")
@@ -1381,5 +1391,3 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
     
     # 返回圖形對象和統計資訊
     return fig, ax, stats, XX, YY
-
-
