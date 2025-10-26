@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
-
 """
 Custom colormaps for meteorological visualization
-Based on Taiwan Central Weather Administration (CWA) color schemes
 """
 
 import numpy as np
@@ -32,6 +30,7 @@ def mycmap(cmap_name='rain300'):
     
     if cmap_name == 'rain300':
         # Colors based on CWA quantitative precipitation forecast. 
+        # Based on Taiwan Central Weather Administration (CWA) color schemes
         # 18 colors, 17 levels,
         colors = [
             '#FFFFFF',  #0  

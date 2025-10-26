@@ -1,4 +1,110 @@
 #--------------------------------------------
+# 使用者資訊標註的功能
+#--------------------------------------------
+def add_user_info_text(ax, user_info, 
+                       user_info_loc='upper right',
+                       user_info_fontsize=6,
+                       user_info_offset=(0.00, 0.00),
+                       user_info_color='black',
+                       user_info_stroke_width=0,
+                       user_info_stroke_color='white',
+                       silent=False,
+                       indent=0):
+    """
+    在圖表上添加使用者資訊文字標註
+    
+    參數:
+        ax: matplotlib axes物件
+        user_info (str or list or None): 使用者自訂資訊文字
+        user_info_loc (str): 使用者資訊的顯示位置
+        user_info_fontsize (int): 使用者資訊的字體大小
+        user_info_offset (tuple): 使用者資訊位置的偏移量(x_offset, y_offset)
+        user_info_color (str): 使用者資訊的文字顏色
+        user_info_stroke_width (float): 描邊寬度
+        user_info_stroke_color (str): 描邊顏色
+        silent (bool): 是否抑制輸出
+        indent (int): 終端輸出縮排空格數
+    
+    返回:
+        text_obj: matplotlib text物件（如果有創建的話）
+    """
+    import matplotlib.patheffects as patheffects
+    
+    if user_info is None:
+        return None
+    
+    ind2 = ' ' * (indent + 4)
+    
+    # 處理輸入格式
+    if isinstance(user_info, str):
+        info_text = user_info
+    elif isinstance(user_info, (list, tuple)):
+        info_text = '\n'.join(str(item) for item in user_info)
+    else:
+        info_text = str(user_info)
+    
+    # 根據位置參數決定座標
+    loc_dict = {
+        # 上邊的外面
+        'upper right': (1.00, 1.01, 'right', 'bottom'),
+        'top right':   (1.00, 1.01, 'right', 'bottom'),
+        'upper left': (-0.02, 1.04, 'left', 'bottom'),
+        'top left':   (-0.02, 1.04, 'left', 'bottom'),
+        # 下邊的外面
+        'lower right':  (1.03, -0.05, 'left', 'top'),
+        'bottom right': (1.03, -0.05, 'left', 'top'),
+        'lower left':  (0.00, -0.10, 'left', 'top'),
+        'bottom left': (0.00, -0.10, 'left', 'top'),
+        # 圖形區域內側四角
+        'inner upper left':  (0.01, 0.99, 'left', 'top'),
+        'inner upper right': (0.99, 0.99, 'right', 'top'),
+        'inner lower left':  (0.01, 0.01, 'left', 'bottom'),
+        'inner lower right': (0.99, 0.01, 'right', 'bottom'),       
+    }
+    
+    if user_info_loc not in loc_dict:
+        if not silent:
+            print(f"{ind2}user_info_loc not in loc_dict")
+        user_info_loc = 'upper right'
+        if not silent:
+            print(f"{ind2}    user_info_loc was changed to {user_info_loc}")
+    
+    x_pos, y_pos, ha, va = loc_dict[user_info_loc]    
+    
+    # 應用位置偏移量
+    x_pos = x_pos + user_info_offset[0]
+    y_pos = y_pos + user_info_offset[1]
+    
+    # 創建文字物件
+    text_obj = ax.text(x_pos, y_pos, info_text,
+                      horizontalalignment=ha,
+                      verticalalignment=va,
+                      transform=ax.transAxes,
+                      fontsize=user_info_fontsize,
+                      color=user_info_color,
+                      alpha=1.0,
+                      zorder=95)
+    
+    # 根據 stroke_width 決定是否添加描邊效果
+    if user_info_stroke_width > 0:
+        outline_effect = patheffects.withStroke(
+            linewidth=user_info_stroke_width,
+            foreground=user_info_stroke_color
+        )
+        text_obj.set_path_effects([outline_effect])
+        
+        if not silent:
+            print(f"{ind2}使用者資訊標註於: {user_info_loc} (含描邊效果)")
+            print(f"{ind2}    文字: {user_info_color}，描邊: {user_info_stroke_color} (寬度={user_info_stroke_width})")
+            print(f"{ind2}    內容: {info_text}")
+    else:
+        if not silent:
+            print(f"{ind2}使用者資訊標註於: {user_info_loc}")
+            print(f"{ind2}    內容: {info_text}")
+    
+    return text_obj
+
+#--------------------------------------------
 # 視覺化一個輸入陣列
 #--------------------------------------------
 def plot_2D_shaded(array, x=None, y=None, annotation=False,
@@ -19,6 +125,8 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
                    # draw information
                    title=" ",
                    title_loc='left',
+
+                   # user_info* 可以是單組或列表
                    user_info=None,  # 可以是字串或字串列表
                    user_info_loc='upper right',  # 位置選項: 'upper/lower' + 'left/right'
                    user_info_fontsize=6,
@@ -26,6 +134,7 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
                    user_info_color='black',
                    user_info_stroke_width=0,        # 修改：預設0表示不描邊
                    user_info_stroke_color='white',  # 描邊顏色
+
                    system_time=False,
                    system_time_offset=(0.00, 0.00),
                    system_time_info=None,
@@ -140,12 +249,10 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
             注意：調整aspect ratio會改變圖形的視覺呈現，但不影響數據座標範圍
 
     === 地圖特徵參數 ===
-        coastline (tuple or None): 海岸線顏色(外層, 內層)，預設('yellow', 'black')
+        coastline (tuple or None): 海岸線顏色(外層, 內層)，預設('black', 'yellow')
             - tuple: (外層顏色, 內層顏色)，繪製雙層海岸線增強可見度
             - None: 不繪製海岸線
-            - 外層通常使用亮色(如'yellow')作為邊框，內層使用深色(如'black')作為主體
-            例如：('white', 'black'), ('yellow', 'blue')        
-        coastline_width (tuple): 海岸線寬度(外層, 內層)，預設(1.3, 1.0)
+        coastline_width (tuple): 海岸線寬度(外層, 內層)，預設(1.0, 0)
             - (外層線寬, 內層線寬)，外層應略粗於內層
             例如：(2.0, 1.5), (1.5, 1.0)        
         coastline_resolution (str): 海岸線解析度，預設'50m'
@@ -329,6 +436,7 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
             例如：user_info_color='white', user_info_stroke_color='black'   
 
     v1.16 2025-10-26 user_info 增加描邊效果與內側位置選項
+                     user_info 的區塊提取成一個獨立的函數
     v1.12 2025-10-25 調整參數命名
                      增加extent_auto自動調節功能
     v1.11.1 2025-10-23 微調輸出
@@ -1361,70 +1469,31 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
 
     # ============ 使用者資訊標註 ============
     if user_info is not None:
-        import matplotlib.patheffects as patheffects
-        
-        # 處理輸入格式
-        if isinstance(user_info, str):
-            info_text = user_info
-        elif isinstance(user_info, (list, tuple)):
-            info_text = '\n'.join(str(item) for item in user_info)
+        # 判斷是單組還是多組
+        if isinstance(user_info, list) and len(user_info) > 0 and isinstance(user_info[0], dict):
+            # 多組設定，每組是一個dict
+            for info_dict in user_info:
+                add_user_info_text(ax, 
+                                 info_dict.get('text'),
+                                 user_info_loc=info_dict.get('loc', 'upper right'),
+                                 user_info_fontsize=info_dict.get('fontsize', 6),
+                                 user_info_offset=info_dict.get('offset', (0.00, 0.00)),
+                                 user_info_color=info_dict.get('color', 'black'),
+                                 user_info_stroke_width=info_dict.get('stroke_width', 0),
+                                 user_info_stroke_color=info_dict.get('stroke_color', 'white'),
+                                 silent=silent,
+                                 indent=indent)
         else:
-            info_text = str(user_info)
-        
-        # 根據位置參數決定座標
-        loc_dict = {
-            # 上邊的外面
-            'upper right': (1.00, 1.01, 'right', 'bottom'),
-            'top right':   (1.00, 1.01, 'right', 'bottom'),
-            'upper left': (-0.02, 1.04, 'left', 'bottom'),
-            'top left':   (-0.02, 1.04, 'left', 'bottom'),
-            # 下邊的外面
-            'lower right':  (1.03, -0.05, 'left', 'top'),
-            'bottom right': (1.03, -0.05, 'left', 'top'),
-            'lower left':  (0.00, -0.10, 'left', 'top'),
-            'bottom left': (0.00, -0.10, 'left', 'top'),
-            # 圖形區域內側四角
-            'inner upper left':  (0.01, 0.99, 'left', 'top'),
-            'inner upper right': (0.99, 0.99, 'right', 'top'),
-            'inner lower left':  (0.01, 0.01, 'left', 'bottom'),
-            'inner lower right': (0.99, 0.01, 'right', 'bottom'),       
-        }        
-        if user_info_loc not in loc_dict:
-            print(f"{ind2}user_info_loc not in loc_dict")
-            user_info_loc = 'upper right'
-            print(f"{ind2}    user_info_loc was changed to {user_info_loc}")
-        x_pos, y_pos, ha, va = loc_dict[user_info_loc]    
-        
-        # 應用位置偏移量
-        x_pos = x_pos + user_info_offset[0]
-        y_pos = y_pos + user_info_offset[1]
-        
-        # 創建文字物件
-        text_obj = ax.text(x_pos, y_pos, info_text,
-                          horizontalalignment=ha,
-                          verticalalignment=va,
-                          transform=ax.transAxes,  # 相對於繪圖區域(ax)寫上文字
-                          fontsize=user_info_fontsize,
-                          color=user_info_color,
-                          alpha=1.0,
-                          zorder=95)
-        
-        # 根據 stroke_width 決定是否添加描邊效果
-        if user_info_stroke_width > 0:
-            outline_effect = patheffects.withStroke(
-                linewidth=user_info_stroke_width,
-                foreground=user_info_stroke_color
-            )
-            text_obj.set_path_effects([outline_effect])
-            
-            if not silent:
-                print(f"{ind2}使用者資訊標註於: {user_info_loc} (含描邊效果)")
-                print(f"{ind2}    文字: {user_info_color}, 描邊: {user_info_stroke_color} (寬度={user_info_stroke_width})")
-                print(f"{ind2}    內容: {info_text}")
-        else:
-            if not silent:
-                print(f"{ind2}使用者資訊標註於: {user_info_loc}")
-                print(f"{ind2}    內容: {info_text}")
+            # 單組設定
+            add_user_info_text(ax, user_info,
+                              user_info_loc=user_info_loc,
+                              user_info_fontsize=user_info_fontsize,
+                              user_info_offset=user_info_offset,
+                              user_info_color=user_info_color,
+                              user_info_stroke_width=user_info_stroke_width,
+                              user_info_stroke_color=user_info_stroke_color,
+                              silent=silent,
+                              indent=indent)
 
     # ============ After Draw ============
     if show:

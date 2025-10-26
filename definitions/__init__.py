@@ -4,6 +4,7 @@ __all__ = [
     'def_custom_cross_section', 
     'def_show_array_info',
     'plot_2D_shaded',
+    'add_user_info_text',  # 新增這行
     'mycmap'
 ]
 
@@ -18,3 +19,4 @@ from .mycmap import mycmap
 p2d = plot_2D_shaded
 ari = array_info
 q2x = quantity_to_xarray
+auit = add_user_info_text  # 可以選擇性地為新函數設定別名
