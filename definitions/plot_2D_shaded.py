@@ -4,6 +4,7 @@
 def plot_2D_shaded(array, x=None, y=None, annotation=False,
                    levels=None, cmap='viridis', norm=None,
 
+                   #colorbar
                    colorbar=True, colorbar_location='right',      
                    colorbar_ticks=None, colorbar_label=None,                 
                    colorbar_offset=0,           
@@ -11,25 +12,35 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
                    colorbar_shrink_bai=0.8,       
                    colorbar_aspect_bai=0.9,     
 
+                   # output
                    figsize=(6, 5), o=None,
-                   title=" ", title_loc='left',
+                   dpi=300, ax=None, fig=None, show=True, 
+                   
+                   # draw information
+                   title=" ",
+                   title_loc='left',
                    user_info=None,  # 可以是字串或字串列表
                    user_info_loc='upper right',  # 位置選項: 'upper/lower' + 'left/right'
                    user_info_fontsize=6,
                    user_info_offset=(0.00, 0.00),
                    user_info_color='black',
+                   user_info_stroke_width=0,        # 修改：預設0表示不描邊
+                   user_info_stroke_color='white',  # 描邊顏色
                    system_time=False,
                    system_time_offset=(0.00, 0.00),
                    system_time_info=None,
+                   xlabel=" ", ylabel=" ", indent=0, 
                    
                    projection=None, transform=None, 
                    aspect_ratio=None,  # 新增：控制圖形長寬比，例如 (1.5, 1) 或 1.5
-                   xlabel=" ", ylabel=" ", indent=0, 
-
-                   coastline_color=('yellow', 'black'), 
-                   coastline_width=(1.7, 1.5), 
+                   invert_xaxis=False, invert_yaxis=False,
+                   
+                   # coastline
+                   coastline_color=('black', 'yellow'), 
+                   coastline_width=(1.0, 0), 
                    coastline_resolution='50m',
 
+                   # grid line
                    grid=True, grid_type=None, grid_int=None, 
                    grid_xticks = None, grid_yticks = None, 
                    grid_xticks_labels = None, grid_yticks_labels = None,
@@ -37,19 +48,19 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
                    grid_zordwr = 9, grid_color = 'gray', gxylim=None,
                    xaxis_DateFormatter=None, yaxis_DateFormatter=None,
 
+                   # vector
                    vx=None, vy=None, vc1='black', vc2='white', 
                    vwidth=6, vlinewidth=0.4, vscale=None, vskip=None,
                    vref=None, vunit=None, vkey_offset=(0.00, 0.00),
                    vx_bai=None, vy_bai=None, vkey_labelpos='N',
                    color_quiverkey=None,
 
+                   # contour
                    cnt=None, ccolor='magenta', clevels=None, cints=None,
                    cwidth=(0.8, 2.0), ctype=('-', '-'), cntype=('--', '--'), clab=(False, True),
                    czorder=None,  
-
-                   invert_xaxis=False, invert_yaxis=False,
-
-                   silent=False, dpi=300, ax=None, fig=None, show=True 
+                   
+                   silent=False
                    ):
     '''
     快速將NumPy陣列繪製成2D圖像進行可視化分析，支援向量場疊加與多組等值線
@@ -134,7 +145,7 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
             - None: 不繪製海岸線
             - 外層通常使用亮色(如'yellow')作為邊框，內層使用深色(如'black')作為主體
             例如：('white', 'black'), ('yellow', 'blue')        
-        coastline_width (tuple): 海岸線寬度(外層, 內層)，預設(1.7, 1.5)
+        coastline_width (tuple): 海岸線寬度(外層, 內層)，預設(1.3, 1.0)
             - (外層線寬, 內層線寬)，外層應略粗於內層
             例如：(2.0, 1.5), (1.5, 1.0)        
         coastline_resolution (str): 海岸線解析度，預設'50m'
@@ -293,17 +304,31 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
             - list/tuple: 多行文字，每個元素為一行
             例如：["Model: WRF", "Resolution: 3km", "Date: 2024-10-22"]            
         user_info_loc (str): 使用者資訊的顯示位置，預設'upper right'
-            - 'upper right': 圖形區域右上角
-            - 'upper left': 圖形區域左上角
-            - 'lower right': 圖形區域右下角
-            - 'lower left': 圖形區域左下角
+            - 'upper right': 面板區域右上角
+            - 'upper left': 面板區域左上角
+            - 'lower right': 面板區域右下角
+            - 'lower left': 面板區域左下角
+            - 'inner upper right': 圖形區域內側右上角
+            - 'inner upper left': 圖形區域內側左上角
+            - 'inner lower right': 圖形區域內側右下角
+            - 'inner lower left': 圖形區域內側左下角
             注意：此位置是相對於繪圖區域(ax)  
         user_info_offset (tuple): 使用者資訊位置的偏移量(x_offset, y_offset)，預設(0.00, 0.00)
             - 用於微調使用者資訊的顯示位置，正值向右/向上移動，負值向左/向下移動
             例如：(0.05, -0.05)表示向右移動5%，向下移動5%
             例如：(-0.10, 0.00)表示向左移動10%，垂直位置不變      
-        user_info_fontsize (int): 使用者資訊的字體大小，預設5       
+        user_info_fontsize (int): 使用者資訊的字體大小，預設6
+        user_info_color (str): 使用者資訊的文字顏色，預設'black'
+        user_info_stroke_width (float): 描邊寬度，預設0（不描邊）
+            - 0 或負值: 不使用描邊效果
+            - >0: 啟用描邊效果，數值越大描邊越粗
+            例如：user_info_stroke_width=2
+        user_info_stroke_color (str): 描邊顏色，預設'white'
+            - 僅在 user_info_stroke_width > 0 時生效
+            - 常用組合：黑色文字配白色描邊，或白色文字配黑色描邊
+            例如：user_info_color='white', user_info_stroke_color='black'   
 
+    v1.16 2025-10-26 user_info 增加描邊效果與內側位置選項
     v1.12 2025-10-25 調整參數命名
                      增加extent_auto自動調節功能
     v1.11.1 2025-10-23 微調輸出
@@ -1336,6 +1361,8 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
 
     # ============ 使用者資訊標註 ============
     if user_info is not None:
+        import matplotlib.patheffects as patheffects
+        
         # 處理輸入格式
         if isinstance(user_info, str):
             info_text = user_info
@@ -1346,36 +1373,58 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
         
         # 根據位置參數決定座標
         loc_dict = {
+            # 上邊的外面
             'upper right': (1.00, 1.01, 'right', 'bottom'),
             'top right':   (1.00, 1.01, 'right', 'bottom'),
-            'upper left': (-0.02, 1.04, 'right', 'bottom'),
-            'top left':   (-0.02, 1.04, 'right', 'bottom'),
-
+            'upper left': (-0.02, 1.04, 'left', 'bottom'),
+            'top left':   (-0.02, 1.04, 'left', 'bottom'),
+            # 下邊的外面
             'lower right':  (1.03, -0.05, 'left', 'top'),
             'bottom right': (1.03, -0.05, 'left', 'top'),
             'lower left':  (0.00, -0.10, 'left', 'top'),
             'bottom left': (0.00, -0.10, 'left', 'top'),
+            # 圖形區域內側四角
+            'inner upper left':  (0.01, 0.99, 'left', 'top'),
+            'inner upper right': (0.99, 0.99, 'right', 'top'),
+            'inner lower left':  (0.01, 0.01, 'left', 'bottom'),
+            'inner lower right': (0.99, 0.01, 'right', 'bottom'),       
         }        
         if user_info_loc not in loc_dict:
+            print(f"{ind2}user_info_loc not in loc_dict")
             user_info_loc = 'upper right'
+            print(f"{ind2}    user_info_loc was changed to {user_info_loc}")
         x_pos, y_pos, ha, va = loc_dict[user_info_loc]    
         
-        # 應用位置偏移量（在ax.transAxes座標系統中，範圍為0-1）
+        # 應用位置偏移量
         x_pos = x_pos + user_info_offset[0]
         y_pos = y_pos + user_info_offset[1]
-
-        ax.text(x_pos, y_pos, info_text,
-               horizontalalignment=ha,
-               verticalalignment=va,
-               transform=ax.transAxes,
-               fontsize=user_info_fontsize,
-               color=user_info_color,
-               alpha=1.0,
-               zorder=95)
         
-        if not silent:
-            print(f"{ind2}使用者資訊標註於: {user_info_loc}")
-            print(f"{ind2}    使用者資訊: {info_text}")
+        # 創建文字物件
+        text_obj = ax.text(x_pos, y_pos, info_text,
+                          horizontalalignment=ha,
+                          verticalalignment=va,
+                          transform=ax.transAxes,  # 相對於繪圖區域(ax)寫上文字
+                          fontsize=user_info_fontsize,
+                          color=user_info_color,
+                          alpha=1.0,
+                          zorder=95)
+        
+        # 根據 stroke_width 決定是否添加描邊效果
+        if user_info_stroke_width > 0:
+            outline_effect = patheffects.withStroke(
+                linewidth=user_info_stroke_width,
+                foreground=user_info_stroke_color
+            )
+            text_obj.set_path_effects([outline_effect])
+            
+            if not silent:
+                print(f"{ind2}使用者資訊標註於: {user_info_loc} (含描邊效果)")
+                print(f"{ind2}    文字: {user_info_color}, 描邊: {user_info_stroke_color} (寬度={user_info_stroke_width})")
+                print(f"{ind2}    內容: {info_text}")
+        else:
+            if not silent:
+                print(f"{ind2}使用者資訊標註於: {user_info_loc}")
+                print(f"{ind2}    內容: {info_text}")
 
     # ============ After Draw ============
     if show:
