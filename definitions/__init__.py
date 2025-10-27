@@ -3,8 +3,10 @@ __all__ = [
     'def_quantity_to_xarray',
     'def_custom_cross_section', 
     'def_show_array_info',
+    'add_user_info_text',  
     'plot_2D_shaded',
-    'add_user_info_text',  # 新增這行
+    'draw_ol',  
+    'add_user_info_text',
     'mycmap'
 ]
 
@@ -12,7 +14,9 @@ __all__ = [
 from .def_quantity_to_xarray import *
 from .def_custom_cross_section import *
 from .def_show_array_info import *
-from .plot_2D_shaded import *
+from .plot_2D_shaded import plot_2D_shaded
+from .draw_ol import *
+from .add_user_info_text import *
 from .mycmap import mycmap
 
 # 設定別名

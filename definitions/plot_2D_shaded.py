@@ -105,6 +105,17 @@ def add_user_info_text(ax, user_info,
     return text_obj
 
 #--------------------------------------------
+# 加粗座標軸的邊框
+#--------------------------------------------
+def draw_ol(ax, linewidth=2.7, color='black', zorder=99):
+    """加粗座標軸的邊框"""
+    for spine in ax.spines.values():
+        spine.set_linewidth(linewidth)
+        spine.set_edgecolor(color)
+        if zorder is not None:
+            spine.set_zorder(zorder)
+
+#--------------------------------------------
 # 視覺化一個輸入陣列
 #--------------------------------------------
 def plot_2D_shaded(array, x=None, y=None, annotation=False,
@@ -753,9 +764,8 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
                 print(f"{ind2}警告: aspect_ratio格式不正確，忽略此設定")
 
     # 加粗框
-    for spine in ax.spines.values():
-        spine.set_linewidth(2.7)
-        spine.set_zorder(99)
+    #from definitions.draw_ol import draw_ol as draw_ol
+    draw_ol(ax)
     
     # 添加標題和軸標籤    
     if title:
@@ -1475,12 +1485,12 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
             for info_dict in user_info:
                 add_user_info_text(ax, 
                                  info_dict.get('text'),
-                                 user_info_loc=info_dict.get('loc', 'upper right'),
-                                 user_info_fontsize=info_dict.get('fontsize', 6),
-                                 user_info_offset=info_dict.get('offset', (0.00, 0.00)),
-                                 user_info_color=info_dict.get('color', 'black'),
-                                 user_info_stroke_width=info_dict.get('stroke_width', 0),
-                                 user_info_stroke_color=info_dict.get('stroke_color', 'white'),
+                                 user_info_loc=info_dict.get('loc', user_info_loc),
+                                 user_info_fontsize=info_dict.get('fontsize', user_info_fontsize),
+                                 user_info_offset=info_dict.get('offset', user_info_offset),
+                                 user_info_color=info_dict.get('color', user_info_color),
+                                 user_info_stroke_width=info_dict.get('stroke_width', user_info_stroke_width),
+                                 user_info_stroke_color=info_dict.get('stroke_color', user_info_stroke_color),
                                  silent=silent,
                                  indent=indent)
         else:
