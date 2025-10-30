@@ -120,6 +120,7 @@ def draw_ol(ax, linewidth=2.7, color='black', zorder=99):
 #--------------------------------------------
 def plot_2D_shaded(array, x=None, y=None, annotation=False,
                    levels=None, cmap='viridis', norm=None,
+                   background_color = 'gray',
 
                    #colorbar
                    colorbar=True, colorbar_location='right',      
@@ -146,10 +147,20 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
                    user_info_stroke_width=0,        # 修改：預設0表示不描邊
                    user_info_stroke_color='white',  # 描邊顏色
 
+                   # system_time 在 figure 右下角
                    system_time=False,
                    system_time_offset=(0.00, 0.00),
                    system_time_info=None,
-                   xlabel=" ", ylabel=" ", indent=0, 
+                   system_time_fontsize=5,
+                   system_time_color='black',
+
+                   # fig_info 在 figure 左上角
+                   fig_info=None,  # 可以是字串或字串列表
+                   fig_info_offset=(0.00, 0.00),
+                   fig_info_fontsize=5,
+                   fig_info_color='black',
+                   fig_info_stroke_width=0,
+                   fig_info_stroke_color='white',
                    
                    projection=None, transform=None, 
                    aspect_ratio=None,  # 新增：控制圖形長寬比，例如 (1.5, 1) 或 1.5
@@ -167,13 +178,15 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
                    grid_linestyle=':', grid_linewidth=1.5, grid_alpha = 0.6, 
                    grid_zordwr = 9, grid_color = 'gray', gxylim=None,
                    xaxis_DateFormatter=None, yaxis_DateFormatter=None,
+                   xlabel=" ", ylabel=" ", indent=0, 
 
                    # vector
                    vx=None, vy=None, vc1='black', vc2='white', 
                    vwidth=6, vlinewidth=0.4, vscale=None, vskip=None,
                    vref=None, vunit=None, vkey_offset=(0.00, 0.00),
                    vx_bai=None, vy_bai=None, vkey_labelpos='N',
-                   color_quiverkey=None,
+                   color_quiverkey=None,        
+                   vzorder = 75,                   
 
                    # contour
                    cnt=None, ccolor='magenta', clevels=None, cints=None,
@@ -192,6 +205,7 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
         x (array-like): 經度座標
         y (array-like): 緯度座標
         figsize (tuple): 圖形尺寸(寬, 高)，預設(6, 5)
+        background_color: base color drawed before shaded plotted，預設'gray'
         
     === 圖形樣式參數 ===
         levels (list): 等值線/色階的值，如果為None則自動產生
@@ -356,7 +370,7 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
         vc2 (str): 向量邊界顏色，預設'lightblue'        
         vwidth (float): 向量寬度，預設6
             注意：程式內自動除以1000，實際寬度為0.006        
-        vlinewidth (float): 向量邊界線寬，預設0.6        
+        vlinewidth (float): 向量邊界線寬，預設0.4        
         vscale (float): 向量縮放比例，若為None則自動設為max_wind_speed*4
             數值越大，箭頭越短        
         vskip (tuple): 向量跳點設定(skip_x, skip_y)
@@ -367,6 +381,7 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
         vunit (str): 向量單位標註，若為None則自動從數據中提取        
         vkey_offset (tuple): quiverkey位置偏移量(x_offset, y_offset)用於微調參考箭頭的顯示位置，預設(0.0, 0.0)
             實際位置為(1.05+offset[0], 1.03+offset[1])
+        vzorder (int):  預設75
                 
     === 等值線參數 ===
         cnt (array-like or list of array-like): 等值線變數
@@ -415,7 +430,21 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
         system_time (bool): 是否在圖形下角標註系統時間，預設False
             - True: 在figure下角顯示圖形創建時間（格式：YYYY-MM-DD HH:MM:SS）
             - False: 不顯示系統時間
-            - 系統時間使用小字體，不干擾主要視覺化內容            
+            - 系統時間使用小字體，不干擾主要視覺化內容 
+        fig_info (str or list or None): Figure 左上角的標註文字，預設 None
+            - None: 不顯示 fig_info
+            - str: 單行文字，例如："Analysis Period: 2024-10-22 to 2024-10-28"
+            - list/tuple: 多行文字，每個元素為一行
+            例如：["Model: WRF v4.0", "Domain: d02", "Resolution: 3km"]
+        fig_info_fontsize (int): fig_info 的字體大小，預設 8
+        fig_info_offset (tuple): fig_info 位置的偏移量 (x_offset, y_offset)，預設 (0.00, 0.00)
+            - 用於微調 fig_info 的顯示位置
+            例如：(0.02, -0.02) 表示向右移動 2%，向下移動 2%
+        fig_info_color (str): fig_info 的文字顏色，預設 'black'
+        fig_info_stroke_width (float): 描邊寬度，預設 0（不描邊）
+            - 0 或負值：不使用描邊效果
+            - >0：啟用描邊效果，數值越大描邊越粗
+        fig_info_stroke_color (str): 描邊顏色，預設 'white'           
         user_info (str or list or None): 使用者自訂資訊文字，預設None
             - None: 不顯示使用者資訊
             - str: 單行文字，例如："Experiment A"
@@ -446,6 +475,9 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
             - 常用組合：黑色文字配白色描邊，或白色文字配黑色描邊
             例如：user_info_color='white', user_info_stroke_color='black'   
 
+    v1.17.1 2025-10-30 將刻度線移到色條內側. 微調預設參數
+                       增加 fig_info 參數，可在 figure 左上角添加標註文字
+    v1.17 2025-10-27 調整axes.unicode_minus
     v1.16 2025-10-26 user_info 增加描邊效果與內側位置選項
                      user_info 的區塊提取成一個獨立的函數
     v1.12 2025-10-25 調整參數命名
@@ -525,11 +557,7 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
     import cartopy.feature as cfeature
     import cartopy.mpl.ticker as cticker   
     from datetime import datetime
-
-    plt.rcParams['font.sans-serif'] = ['DejaVu Sans', 'Arial', 'sans-serif']
-    plt.rcParams['axes.unicode_minus'] = False
-    #print(f"Current font: {matplotlib.rcParams['font.sans-serif']}")
-    #print(f"Unicode minus: {matplotlib.rcParams['axes.unicode_minus']}")
+    import matplotlib.patheffects as patheffects
     
     # 建立縮排字串
     ind = ' ' * indent
@@ -633,6 +661,12 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
     stats['nan_percent'] = nan_percent = nan_count / (rows * cols) * 100
     stats['valid_count'] = valid_count = rows * cols - nan_count
     stats['valid_percent'] = valid_percent = 100 - nan_percent
+
+    if (grid_type == 3) or (grid_type == 'Lat-Lon'):
+        if projection is None:
+            projection = ccrs.PlateCarree()
+        if transform is None:
+            transform = ccrs.PlateCarree()
     
     if not silent:
         print(f"{ind2}    NaN值數量:    {nan_count} / {rows * cols} ({nan_percent:.2f}%)")
@@ -642,7 +676,7 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
         if len(data_valid) > 0:
             # 使用Sturges公式計算適當的等級數
             n_bins = int(np.ceil(np.log2(len(data_valid)) + 1))
-            levels = MaxNLocator(nbins=n_bins+40).tick_values(np.percentile(data_valid, 5), np.percentile(data_valid, 95))
+            levels = MaxNLocator(nbins=n_bins+40).tick_values(np.percentile(data_valid, 2.5), np.percentile(data_valid, 97.5))
         else:
             levels = np.linspace(data_min, data_max, 11)  # 默認範圍
     
@@ -655,8 +689,8 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
     #        print(f"{ind2}    色彩等值線範圍:   {levels[0]} - {levels[-1]}")
 
     # 創建圖形
-    print(f"{ind2}創建圖形:")
-    background_color = 'gray'
+    print(f"{ind2}創建圖形:")    
+    background_color = background_color
     print(f"{ind2}    設定背景顏色: {background_color}")
     if ax is None:
         if projection is not None:
@@ -781,7 +815,7 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
         
         # 1. 決定orientation和pad0        
         if colorbar_location in ['right', 'left']:
-            pad0 = 0.03
+            pad0 = 0.04
             colorbar_orientation = 'vertical'
             colorbar_fraction_base = 0.10
             colorbar_shrink_base = 1.0
@@ -821,7 +855,11 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
         # 當空間不足時，shrink 與 aspect 的調整效果會受限，colorbar 可能出現非預期變形。
         # 此時需增加 fraction 提供更多空間。
         
-        cbar.ax.tick_params(labelsize=10)
+        #將刻度線移到色條內側 
+        cbar.ax.tick_params(direction='in', length=8, width=1, which='major', color='#000000')
+        #cbar.ax.tick_params(direction='in', length=8, width=0.5, which='major', color='#FFFFFF')
+        #cbar.ax.tick_params(labelsize=10)
+
         
         # 5. 設定colorbar標籤
         if colorbar_label is not None:
@@ -978,6 +1016,8 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
 
         elif (grid_type == None) or (grid_type == 1):
             print(f"{ind2}    grid type: basic grid (ax.grid)")
+            if grid_int is not None:
+                print(f"{ind2}    !! grid_int does not work when grid_type == 1, please use grid_xticks and grid_yticks") 
 
             if grid_xticks is not None:
                 xlocs = grid_xticks
@@ -988,7 +1028,7 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
             if grid_yticks is not None:
                 ylocs = grid_yticks
                 if grid_yticks_labels is not None:
-                    print(f"{ind2}    xticks_labels:{grid_yticks_labels}")
+                    print(f"{ind2}    yticks_labels:{grid_yticks_labels}")
                 ax.set_yticks(ylocs, labels=grid_yticks_labels)    
                         
             ax.grid(True, 
@@ -1162,12 +1202,13 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
         vwidth_actual = vwidth / 1000
 
         # 繪製向量場
+        zorder_quiver_base = vzorder
         if use_regrid:
             qu = ax.quiver(XX, YY, vx_data, vy_data,
                           color=vc1, width=vwidth_actual,
                           edgecolor=vc2, linewidth=vlinewidth,
                           scale=vscale, scale_units='inches',
-                          transform=transform, regrid_shape=vskip, zorder=20)
+                          transform=transform, regrid_shape=vskip, zorder=zorder_quiver_base)
         else:
             # 使用切片方式
             qu = ax.quiver(XX[::vskip[1], ::vskip[0]], YY[::vskip[1], ::vskip[0]], 
@@ -1175,31 +1216,32 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
                           color=vc1, width=vwidth_actual,
                           edgecolor=vc2, linewidth=vlinewidth,
                           scale=vscale, scale_units='inches',
-                          zorder=20)
+                          zorder=zorder_quiver_base)
         
         stats['quiver'] = qu
 
         # 添加quiverkey，位置為(1.09, 0.99) + offset
-        qk_x = 1.09 + vkey_offset[0]
-        qk_y = 0.99 + vkey_offset[1]
+        qk_x = 1.08 + vkey_offset[0]
+        qk_y = 1.03 + vkey_offset[1]
 
         if vector_unit == "unknown" or vunit in ["None", "nolabel", "no", " ", ""]:
-            vector_unit_str = " "
+            vector_unit_str = ""
         else:
             if vunit is not None:
                 vector_unit_str = vunit
             else:
-                vector_unit_str = f"[{vector_unit}]"
+                vector_unit_str = f"\n[{vector_unit}]"
       
         # 根據倍率情況決定quiverkey的文字標籤
         if vx_bai is None and vy_bai is None:
-            label_text = f'{vref} {vector_unit_str}'
+            label_text = f'{vref}{vector_unit_str}'
         elif vx_bai is not None and vy_bai is None:            
-            label_text = f'{vref} {vector_unit_str}\n(h ×{vx_bai})'
+            label_text = f'{vref}\n{vector_unit_str}\n(h ×{vx_bai})'
         elif vx_bai is None and vy_bai is not None:
-            label_text = f'{vref} {vector_unit_str}\n(v ×{vy_bai})'
+            label_text = f'{vref}\n{vector_unit_str}\n(v ×{vy_bai})'
         else:
-            label_text = f'{vref} {vector_unit_str}\n(h ×{vx_bai}, v ×{vy_bai})'
+            label_text = f'{vref}\n{vector_unit_str}\n(h ×{vx_bai}, v ×{vy_bai})'
+        #print(label_text)
         
         # auto labelcolor
         if color_quiverkey is None:
@@ -1406,7 +1448,7 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
                     if clab_current[0]:
                         labels1 = ax.clabel(contours1, inline=True, fontsize=10,
                                            fmt=lambda x: f'{x:g}' if x >= 0 else f'–{abs(x):g}',
-                                           inline_spacing=1, zorder=zorder_base)
+                                           inline_spacing=1, zorder=zorder_base+6)
                         for label in labels1:
                             label.set_fontweight(500)
                             label.set_fontsize(10)
@@ -1429,7 +1471,7 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
                     if clab_current[1]:
                         labels2 = ax.clabel(contours2, inline=True, fontsize=10,
                                            fmt=lambda x: f'{x:g}' if x >= 0 else f'–{abs(x):g}',
-                                           inline_spacing=1, zorder=zorder_base)
+                                           inline_spacing=1, zorder=zorder_base+6)
                         for label in labels2:
                             label.set_fontweight(500)
                             label.set_fontsize(10)
@@ -1462,21 +1504,68 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
     if system_time:
         from datetime import datetime
         current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        # 使用 fig.text 在 figure 座標系統中標註
-        # 位置 表示下角,略微偏移避免貼邊
+        
+        # 處理 system_time_info 的格式
         if system_time_info is None:
             system_time_str = f'{current_time}'
+        elif isinstance(system_time_info, (list, tuple)):
+            # 如果是列表，將所有元素用換行符連接
+            info_lines = '\n'.join(str(item) for item in system_time_info)
+            system_time_str = f'{current_time}\n{info_lines}'
         else:
+            # 單一字串
             system_time_str = f'{current_time}\n{system_time_info}'
+        
+        # 使用 fig.text 在 figure 座標系統中標註
+        # 位置表示右下角，略微偏移避免貼邊
         fig.text(1.00+system_time_offset[0], 0.00+system_time_offset[1], system_time_str, 
-                fontsize=5, color='black', alpha=1.0,
-                #ha='left', va='top',
+                fontsize=system_time_fontsize, color=system_time_color, alpha=1.0,
                 ha='right', va='top',
                 transform=fig.transFigure,
                 zorder=100)
         if not silent:
             print(f"{ind2}系統時間標註: {system_time_str}")
 
+    # ============ Figure 資訊標註 ============
+    if fig_info is not None:        
+        # 處理輸入格式
+        if isinstance(fig_info, str):
+            info_text = fig_info
+        elif isinstance(fig_info, (list, tuple)):
+            info_text = '\n'.join(str(item) for item in fig_info)
+        else:
+            info_text = str(fig_info)
+        
+        # 計算實際位置（左上角 + 偏移）
+        x_pos = 0.00 + fig_info_offset[0]
+        y_pos = 1.00 + fig_info_offset[1]
+        
+        # 創建文字物件
+        text_obj = fig.text(x_pos, y_pos, info_text,
+                           ha='left', va='top',
+                           transform=fig.transFigure,
+                           fontsize=fig_info_fontsize,
+                           color=fig_info_color,
+                           alpha=1.0,
+                           zorder=100)
+        
+        # 根據 stroke_width 決定是否添加描邊效果
+        if fig_info_stroke_width > 0:
+            outline_effect = patheffects.withStroke(
+                linewidth=fig_info_stroke_width,
+                foreground=fig_info_stroke_color
+            )
+            text_obj.set_path_effects([outline_effect])
+            
+            if not silent:
+                print(f"{ind2}Figure 資訊標註於左上角（含描邊效果）")
+                print(f"{ind2}    文字：{fig_info_color}，描邊：{fig_info_stroke_color}（寬度={fig_info_stroke_width}）")
+                print(f"{ind2}    內容：{info_text}")
+        else:
+            if not silent:
+                print(f"{ind2}Figure 資訊標註於左上角")
+                print(f"{ind2}    內容：{info_text}")
+    
     # ============ 使用者資訊標註 ============
     if user_info is not None:
         # 判斷是單組還是多組
@@ -1506,6 +1595,12 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
                               indent=indent)
 
     # ============ After Draw ============
+    plt.rcParams['font.sans-serif'] = ['DejaVu Sans', 'Arial', 'sans-serif']
+    plt.rcParams['axes.unicode_minus'] = True  # 使用長負號
+    if not silent:
+        print(f"{ind2}Current font: {matplotlib.rcParams['font.sans-serif']}")
+        print(f"{ind2}Unicode minus: {matplotlib.rcParams['axes.unicode_minus']}")
+
     if show:
         fig.tight_layout()
         fig.show()  # 只在show=True時顯示
