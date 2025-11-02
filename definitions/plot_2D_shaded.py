@@ -47,18 +47,24 @@ def add_user_info_text(ax, user_info,
     loc_dict = {
         # 上邊的外面
         'upper right': (1.00, 1.01, 'right', 'bottom'),
-        'top right':   (1.00, 1.01, 'right', 'bottom'),
-        'upper left': (-0.02, 1.04, 'left', 'bottom'),
-        'top left':   (-0.02, 1.04, 'left', 'bottom'),
+        'top right': (1.00, 1.01, 'right', 'bottom'),
+        'upper left': (0.00, 1.01, 'left', 'bottom'),
+        'top left': (0.00, 1.01, 'left', 'bottom'),
         # 下邊的外面
-        'lower right':  (1.03, -0.05, 'left', 'top'),
-        'bottom right': (1.03, -0.05, 'left', 'top'),
-        'lower left':  (0.00, -0.10, 'left', 'top'),
-        'bottom left': (0.00, -0.10, 'left', 'top'),
+        'lower right': (1.00, -0.06, 'right', 'top'),
+        'bottom right': (1.00, -0.06, 'right', 'top'),
+        'lower left': (0.00, -0.06, 'left', 'top'),
+        'bottom left': (0.00, -0.06, 'left', 'top'),
+        # right side of ax
+        'right lower': (1.03, -0.06, 'left', 'top'),   
+        'right upper': (1.03, 1.00, 'left', 'top'), 
+        # left side of ax
+        'left lower':  (-0.05, 0.00, 'right', 'bottom'),   
+        'left upper':  (-0.05, 1.00, 'right', 'top'), 
         # 圖形區域內側四角
-        'inner upper left':  (0.01, 0.99, 'left', 'top'),
+        'inner upper left': (0.01, 0.99, 'left', 'top'),
         'inner upper right': (0.99, 0.99, 'right', 'top'),
-        'inner lower left':  (0.01, 0.01, 'left', 'bottom'),
+        'inner lower left': (0.01, 0.01, 'left', 'bottom'),
         'inner lower right': (0.99, 0.01, 'right', 'bottom'),       
     }
     
@@ -105,6 +111,119 @@ def add_user_info_text(ax, user_info,
     return text_obj
 
 #--------------------------------------------
+# 向量場圖例繪製功能
+#--------------------------------------------
+def add_vector_quiverkey(ax, qu, qk_x, qk_y, vref, vector_unit_str,
+                        vx_bai=None, vy_bai=None,
+                        vkey_labelpos='W',
+                        color_quiverkey='black',
+                        silent=False,
+                        indent=0):
+    """
+    在圖表上添加向量場參考箭頭(quiverkey)
+    
+    參數:
+        ax: matplotlib axes物件
+        qu: quiver物件(由ax.quiver返回)
+        qk_x (float): quiverkey的x座標(axes座標系統)
+        qk_y (float): quiverkey的y座標(axes座標系統)
+        vref (float): 參考向量長度
+        vector_unit_str (str): 向量單位字串,例如 ' [m/s]'
+        vx_bai (float or None): 水平分量的縮放倍率
+        vy_bai (float or None): 垂直分量的縮放倍率
+        vkey_labelpos (str): 標籤位置 ('N', 'S', 'E', 'W')
+        color_quiverkey (str): 主圖例的顏色
+        silent (bool): 是否抑制輸出
+        indent (int): 終端輸出縮排空格數
+    
+    返回:
+        list: 包含所有創建的quiverkey物件的列表
+    """
+    import matplotlib.patheffects as patheffects
+    
+    def create_quiverkey(angle, stroke_width):
+        """創建一個 quiverkey"""
+        return ax.quiverkey(
+            qu, qk_x, qk_y, vref, "",
+            labelpos='W', coordinates='axes',
+            color=color_quiverkey, labelcolor=color_quiverkey,
+            fontproperties={'size': 10}, 
+            zorder=101 + (0.1 if angle == 0 else 0),
+            angle=angle,
+            path_effects=[patheffects.withStroke(linewidth=stroke_width, foreground="white")]
+        )
+    
+    def add_text_label(text, x_offset, y_offset, rotation=0):
+        """添加文字標籤"""
+        ha = 'right' if x_offset < 0 else 'left'
+        va = 'bottom' if y_offset > 0 else 'top'
+        
+        ax.text(
+            qk_x + x_offset, qk_y + y_offset,
+            text,
+            transform=ax.transAxes,
+            ha=ha, va=va,
+            rotation=rotation,
+            fontsize=7,
+            color=color_quiverkey,
+            zorder=102,
+            path_effects=[patheffects.withStroke(linewidth=2, foreground="white")]
+        )
+    
+    ind2 = ' ' * (indent + 4)
+    quiverkey_list = []
+    
+    # 計算實際值
+    x_value = vref if vx_bai is None else vref / vx_bai
+    y_value = vref if vy_bai is None else vref / vy_bai
+    
+    # 判斷是否需要顯示單位
+    x_label = f'{x_value}{vector_unit_str}' if vx_bai is None else f'{x_value}{vector_unit_str}'
+    y_label = f'{y_value}'
+    
+    # 決定是否需要額外的垂直圖例
+    need_vertical_key = vx_bai is not None or vy_bai is not None
+    
+    if not need_vertical_key:
+        # 沒有縮放,只繪製一個標準圖例
+        qk = ax.quiverkey(
+            qu, qk_x, qk_y, vref, x_label,
+            labelpos=vkey_labelpos, coordinates='axes',
+            color=color_quiverkey, labelcolor=color_quiverkey,
+            fontproperties={'size': 10}, zorder=101,
+            angle=0,
+            path_effects=[patheffects.withStroke(linewidth=5, foreground="white")]
+        )
+        quiverkey_list.append(qk)
+        
+        if not silent:
+            print(f"{ind2}向量圖例: {x_label}")
+    
+    else:
+        # 有縮放,繪製水平和垂直兩個圖例
+        # 水平圖例
+        qk1 = create_quiverkey(angle=0, stroke_width=2)
+        add_text_label(x_label, x_offset=0.003, y_offset=-0.01)
+        quiverkey_list.append(qk1)
+        
+        # 垂直圖例
+        qk2 = create_quiverkey(angle=90, stroke_width=2)
+        add_text_label(y_label, x_offset=-0.01, y_offset=0.003, rotation=90)
+        quiverkey_list.append(qk2)
+        
+        if not silent:
+            scale_info = []
+            if vx_bai is not None:
+                scale_info.append(f"h × {vx_bai}")
+            if vy_bai is not None:
+                scale_info.append(f"v × {vy_bai}")
+            
+            print(f"{ind2}向量圖例 ({'; '.join(scale_info)}):")
+            print(f"{ind2}     圖例x: {x_label}")
+            print(f"{ind2}     圖例y: {y_label}")
+    
+    return quiverkey_list
+#--------------------------------------------
 # 加粗座標軸的邊框
 #--------------------------------------------
 def draw_ol(ax, linewidth=2.7, color='black', zorder=99):
@@ -118,21 +237,32 @@ def draw_ol(ax, linewidth=2.7, color='black', zorder=99):
 #--------------------------------------------
 # 視覺化一個輸入陣列
 #--------------------------------------------
-def plot_2D_shaded(array, x=None, y=None, annotation=False,
-                   levels=None, cmap='viridis', norm=None,
+def plot_2D_shaded(array, x=None, y=None, 
+                   levels=None, 
+                   cmap='viridis', 
+                   alpha=1.0,  # 色階的透明度: 0 代表完全透明,1 代表完全不透明。
                    background_color = 'gray',
+                   norm=None,
+                   annotation=False,
 
                    #colorbar
-                   colorbar=True, colorbar_location='right',      
-                   colorbar_ticks=None, colorbar_label=None,                 
+                   colorbar=True, 
+                   colorbar_location='right',      
+                   colorbar_ticks=None, 
+                   colorbar_label=None,                 
                    colorbar_offset=0,           
                    colorbar_fraction_offset=0,     
                    colorbar_shrink_bai=0.8,       
                    colorbar_aspect_bai=0.9,     
 
                    # output
-                   figsize=(6, 5), o=None,
-                   dpi=300, ax=None, fig=None, show=True, 
+                   figsize=(6, 5), 
+                   o=None, 
+                   dpi=300, 
+                   bbox_inches='tight',   # None, 'tight', Bbox([[0.5, 0.5], [5.5, 4.5]])
+                   ax=None, fig=None, 
+                   show=True, 
+                   indent=0,
                    
                    # draw information
                    title=" ",
@@ -140,7 +270,7 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
 
                    # user_info* 可以是單組或列表
                    user_info=None,  # 可以是字串或字串列表
-                   user_info_loc='upper right',  # 位置選項: 'upper/lower' + 'left/right'
+                   user_info_loc='lower right',  # 位置選項: 'upper/lower' + 'left/right'
                    user_info_fontsize=6,
                    user_info_offset=(0.00, 0.00),
                    user_info_color='black',
@@ -172,25 +302,39 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
                    coastline_resolution='50m',
 
                    # grid line
-                   grid=True, grid_type=None, grid_int=None, 
+                   grid=True, 
+                   grid_type=None, 
+                   grid_int=None, 
                    grid_xticks = None, grid_yticks = None, 
                    grid_xticks_labels = None, grid_yticks_labels = None,
-                   grid_linestyle=':', grid_linewidth=1.5, grid_alpha = 0.6, 
-                   grid_zordwr = 9, grid_color = 'gray', gxylim=None,
+                   xlabel=" ", ylabel=" ",  
                    xaxis_DateFormatter=None, yaxis_DateFormatter=None,
-                   xlabel=" ", ylabel=" ", indent=0, 
+                   grid_linestyle=':', 
+                   grid_linewidth=1.5, 
+                   grid_alpha = 0.6, 
+                   grid_zordwr = 9, 
+                   grid_color = 'gray', 
+                   gxylim=None,
 
                    # vector
-                   vx=None, vy=None, vc1='black', vc2='white', 
-                   vwidth=6, vlinewidth=0.4, vscale=None, vskip=None,
-                   vref=None, vunit=None, vkey_offset=(0.00, 0.00),
-                   vx_bai=None, vy_bai=None, vkey_labelpos='N',
-                   color_quiverkey=None,        
+                   vx=None, vy=None, 
+                   vx_bai=None, vy_bai=None, 
+                   vc1='black', vc2='white', 
+                   vwidth=6, vlinewidth=0.4, 
+                   vscale=None, 
+                   vskip=None,
+                   vref=None, vunit=None, 
+                   vkey_offset=(0.00, 0.00),
+                   vkey_labelpos=None,
+                   vkey_color=None,        
                    vzorder = 75,                   
 
                    # contour
-                   cnt=None, ccolor='magenta', clevels=None, cints=None,
-                   cwidth=(0.8, 2.0), ctype=('-', '-'), cntype=('--', '--'), clab=(False, True),
+                   cnt=None, clevels=None, cints=None,
+                   ccolor='magenta',
+                   cwidth=(0.8, 2.0), 
+                   ctype=('-', '-'), cntype=('--', '--'), 
+                   clab=(False, True),
                    czorder=None,  
                    
                    silent=False
@@ -358,12 +502,12 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
             用於放大或縮小水平風分量以便觀察        
         vy_bai (float): vy的縮放倍率，預設None（不縮放）
             用於放大或縮小垂直風分量以便觀察        
-        vkey_labelpos (str): quiverkey標籤位置，預設'N'
+        vkey_labelpos (str): quiverkey標籤位置，預設None
             - 'N': 標籤在參考箭頭北側（上方）
             - 'S': 標籤在參考箭頭南側（下方）
             - 'E': 標籤在參考箭頭東側（右方）
             - 'W': 標籤在參考箭頭西側（左方）        
-        color_quiverkey (str): quiverkey的顏色，預設None（自動設定）
+        vkey_color (str): quiverkey的顏色，預設None（自動設定）
             - None: 自動使用vc1的顏色（若vc1為白色則改用黑色）
             - str: 手動指定顏色，例如：'red', 'blue', '#FF0000'        
         vc1 (str): 向量主體顏色，預設'black'
@@ -475,8 +619,10 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
             - 常用組合：黑色文字配白色描邊，或白色文字配黑色描邊
             例如：user_info_color='white', user_info_stroke_color='black'   
 
-    v1.17.1 2025-10-30 將刻度線移到色條內側. 微調預設參數
+    v1.17.1 2025-11-02 將刻度線移到色條內側. 微調預設參數
                        增加 fig_info 參數，可在 figure 左上角添加標註文字
+                       增加 alpha 參數,alpha=0 效果等於不畫色階
+                       向量的圖例增加描邊效果
     v1.17 2025-10-27 調整axes.unicode_minus
     v1.16 2025-10-26 user_info 增加描邊效果與內側位置選項
                      user_info 的區塊提取成一個獨立的函數
@@ -766,36 +912,17 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
     #print(transform)
 
     if transform is not None:
-        cf = ax.contourf(XX, YY, array, levels=levels, cmap=cmap_obj, extend='both', zorder=0,
+        cf = ax.contourf(XX, YY, array, levels=levels, cmap=cmap_obj, extend='both', zorder=0, 
+                         alpha=alpha,
                          norm=norm, 
                          transform=transform
                          )
     else:
         cf = ax.contourf(XX, YY, array, levels=levels, cmap=cmap_obj, extend='both', zorder=0,
+                         alpha=alpha,
                          norm=norm)
     
     stats['contourf'] = cf
-
-    # ============ 設定圖形長寬比 ============
-    if aspect_ratio is not None:
-        if isinstance(aspect_ratio, (int, float)):
-            # 單一數值，直接設定
-            ax.set_aspect(aspect_ratio)
-            if not silent:
-                print(f"{ind2}設定aspect ratio: {aspect_ratio}")
-        elif isinstance(aspect_ratio, (tuple, list)) and len(aspect_ratio) == 2:
-            # tuple格式，計算比例
-            ratio = aspect_ratio[0] / aspect_ratio[1]
-            ax.set_aspect(ratio)
-            if not silent:
-                print(f"{ind2}設定aspect ratio: {aspect_ratio[0]}/{aspect_ratio[1]} = {ratio:.3f}")
-        elif aspect_ratio == 'equal':
-            ax.set_aspect('equal')
-            if not silent:
-                print(f"{ind2}設定aspect ratio: equal")
-        else:
-            if not silent:
-                print(f"{ind2}警告: aspect_ratio格式不正確，忽略此設定")
 
     # 加粗框
     #from definitions.draw_ol import draw_ol as draw_ol
@@ -854,6 +981,9 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
         # fraction: 預留給 colorbar 的 Axes 空間比例。
         # 當空間不足時，shrink 與 aspect 的調整效果會受限，colorbar 可能出現非預期變形。
         # 此時需增加 fraction 提供更多空間。
+
+        # 設定colorbar的zorder
+        cbar.ax.set_zorder(50)
         
         #將刻度線移到色條內側 
         cbar.ax.tick_params(direction='in', length=8, width=1, which='major', color='#000000')
@@ -896,6 +1026,27 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
                zorder=90,
                bbox=dict(facecolor='white', alpha=0.8, edgecolor='gray', boxstyle='round,pad=0.5'))
         
+    # ============ 設定圖形長寬比 ============
+    if aspect_ratio is not None:
+        if isinstance(aspect_ratio, (int, float)):
+            # 單一數值，直接設定
+            ax.set_aspect(aspect_ratio)
+            if not silent:
+                print(f"{ind2}設定aspect ratio: {aspect_ratio}")
+        elif isinstance(aspect_ratio, (tuple, list)) and len(aspect_ratio) == 2:
+            # tuple格式，計算比例
+            ratio = aspect_ratio[0] / aspect_ratio[1]
+            ax.set_aspect(ratio)
+            if not silent:
+                print(f"{ind2}設定aspect ratio: {aspect_ratio[0]}/{aspect_ratio[1]} = {ratio:.3f}")
+        elif aspect_ratio == 'equal':
+            ax.set_aspect('equal')
+            if not silent:
+                print(f"{ind2}設定aspect ratio: equal")
+        else:
+            if not silent:
+                print(f"{ind2}警告: aspect_ratio格式不正確，忽略此設定")
+
     # ============ 參考線繪製 ============  
     # 添加海岸線（如果有投影）
     if transform is not None and coastline_color is not None:
@@ -913,13 +1064,13 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
     print(f"{ind2}draw grid:")   
     if grid:
 
-        # 如果沒有指定網格間隔,根據海岸線解析度自動設定
-        if grid_int is None:
-            grid_int = {'10m': (2, 2), '50m': (10, 10), '110m': (30, 30)}.get(coastline_resolution, (10, 10))
-
         if (grid_type == None and type(projection).__name__ == 'PlateCarree') or (grid_type == 3) or (grid_type == 'Lat-Lon'):
             from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
             print(f"{ind2}    grid type: gridlines with labels (for PlateCarree)")   
+
+            # 如果沒有指定網格間隔,根據海岸線解析度自動設定
+            if grid_int is None:
+                grid_int = {'10m': (2, 2), '50m': (10, 10), '110m': (30, 30)}.get(coastline_resolution, (10, 10))
             
             xlocs = np.sort(np.concatenate([-np.arange(grid_int[0], 361, grid_int[0])[::-1], np.arange(0, 361, grid_int[0])]))
             ylocs = np.sort(np.concatenate([-np.arange(grid_int[1], 91, grid_int[1])[::-1], np.arange(0, 91, grid_int[1])]))            
@@ -962,6 +1113,11 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
         elif (grid_type == None and type(projection).__name__ == 'LambertConformal') or (grid_type == 2) or (grid_type == 'Lambert'):            
             print(f"{ind2}    grid type: gridlines with labels (for LambertConformal)")
             # 設定經緯度網格線 - for ccrs.LambertConformal
+
+            # 如果沒有指定網格間隔,根據海岸線解析度自動設定
+            if grid_int is None:
+                grid_int = {'10m': (2, 2), '50m': (10, 10), '110m': (30, 30)}.get(coastline_resolution, (10, 10))
+
             # 生成全球網格線位置
             xlocs_all = np.sort(np.concatenate([-np.arange(grid_int[0], 361, grid_int[0])[::-1], np.arange(0, 361, grid_int[0])]))
             ylocs_all = np.sort(np.concatenate([-np.arange(grid_int[1], 91, grid_int[1])[::-1], np.arange(0, 91, grid_int[1])]))
@@ -1134,7 +1290,8 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
             
             # 自動設定scale（如果沒有提供）
             if vscale is None:                
-                vscale = float(f"{vec_max * 4:.3g}")  # 取3位有效數字
+                #vscale = float(f"{vec_max * 4:.3g}")  # 取3位有效數字
+                vscale = float(f"{np.percentile(wind_speed, 97) * 4:.3g}")  # 取3位有效數字
                 if not silent:
                     print(f"{ind2}    自動設定vscale: {vscale:.3g}")
             else:
@@ -1186,7 +1343,7 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
                 else:
                     print(f"{ind2}    使用陣列切片跳點: {vskip}")
         
-        # 1.7新增：應用倍率縮放 ===================
+        # == 應用倍率縮放 ===================
         if vx_bai is not None:
             vx_data = vx_data * vx_bai
             if not silent:
@@ -1196,7 +1353,7 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
             vy_data = vy_data * vy_bai
             if not silent:
                 print(f"{ind2}    vy已乘以倍率: {vy_bai}")
-        # 1.7新增：應用倍率縮放 ===================
+        # == 應用倍率縮放 ===================
         
         # 轉換vwidth（自動除以1000）
         vwidth_actual = vwidth / 1000
@@ -1220,9 +1377,22 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
         
         stats['quiver'] = qu
 
-        # 添加quiverkey，位置為(1.09, 0.99) + offset
-        qk_x = 1.08 + vkey_offset[0]
-        qk_y = 1.03 + vkey_offset[1]
+        # 添加quiverkey，位置為(qk_x_base, qk_y_base) + offset
+        if (colorbar_location == 'bottom'):
+            qk_x_base = 0.95
+            qk_y_base = 1.05
+            if vkey_labelpos is None: vkey_labelpos = 'N'
+        elif  (colorbar_location == 'right'):
+            qk_x_base = 0.93
+            qk_y_base = 1.03
+            if vkey_labelpos is None: vkey_labelpos = 'W'
+        else:
+            qk_x_base = 0.95
+            qk_y_base = 1.05
+            if vkey_labelpos is None: vkey_labelpos = 'W'
+
+        qk_x = qk_x_base + vkey_offset[0]
+        qk_y = qk_y_base + vkey_offset[1]
 
         if vector_unit == "unknown" or vunit in ["None", "nolabel", "no", " ", ""]:
             vector_unit_str = ""
@@ -1230,30 +1400,38 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
             if vunit is not None:
                 vector_unit_str = vunit
             else:
-                vector_unit_str = f"\n[{vector_unit}]"
+                vector_unit_str = f" [{vector_unit}]"
       
         # 根據倍率情況決定quiverkey的文字標籤
-        if vx_bai is None and vy_bai is None:
-            label_text = f'{vref}{vector_unit_str}'
-        elif vx_bai is not None and vy_bai is None:            
-            label_text = f'{vref}\n{vector_unit_str}\n(h ×{vx_bai})'
-        elif vx_bai is None and vy_bai is not None:
-            label_text = f'{vref}\n{vector_unit_str}\n(v ×{vy_bai})'
-        else:
-            label_text = f'{vref}\n{vector_unit_str}\n(h ×{vx_bai}, v ×{vy_bai})'
+        # if vx_bai is None and vy_bai is None:
+        #     label_text = f'{vref}{vector_unit_str}'
+        # elif vx_bai is not None and vy_bai is None:            
+        #     label_text = f'{vref}{vector_unit_str}\n(horizontal × {vx_bai})'
+        # elif vx_bai is None and vy_bai is not None:
+        #     label_text = f'{vref}{vector_unit_str}\n(vertical × {vy_bai})'
+        # else:
+        #     label_text = f'{vref}{vector_unit_str}\n(h × {vx_bai}, v × {vy_bai})'
         #print(label_text)
         
         # auto labelcolor
-        if color_quiverkey is None:
-            color_quiverkey = vc1
-            if color_quiverkey == 'white' or color_quiverkey == '#FFFFFF':
-                color_quiverkey = 'black'       
+        if vkey_color is None:
+            vkey_color = vc1
+            if vkey_color == 'white' or vkey_color == '#FFFFFF':
+                vkey_color = 'black'       
         
-        # 繪製主體quiverkey
-        qk = ax.quiverkey(qu, qk_x, qk_y, vref, label_text,
-                         labelpos=vkey_labelpos, coordinates='axes', 
-                         color=color_quiverkey, labelcolor=color_quiverkey,
-                         fontproperties={'size': 10}, zorder=99)
+        # 繪製主體quiverkey - 使用新函數
+        quiverkey_list = add_vector_quiverkey(
+            ax=ax, qu=qu, 
+            qk_x=qk_x, qk_y=qk_y, 
+            vref=vref, 
+            vector_unit_str=vector_unit_str,
+            vx_bai=vx_bai, 
+            vy_bai=vy_bai,
+            vkey_labelpos=vkey_labelpos,
+            color_quiverkey=vkey_color,
+            silent=silent,
+            indent=indent
+        )
 
     else:        
         print(f"{ind2}    vector disabled")
@@ -1520,7 +1698,7 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
         # 位置表示右下角，略微偏移避免貼邊
         fig.text(1.00+system_time_offset[0], 0.00+system_time_offset[1], system_time_str, 
                 fontsize=system_time_fontsize, color=system_time_color, alpha=1.0,
-                ha='right', va='top',
+                ha='right', va='bottom',
                 transform=fig.transFigure,
                 zorder=100)
         if not silent:
@@ -1605,10 +1783,10 @@ def plot_2D_shaded(array, x=None, y=None, annotation=False,
         fig.tight_layout()
         fig.show()  # 只在show=True時顯示
 
-    # 保存圖像
+    # 保存圖像    
     if o:        
         fig.tight_layout()
-        fig.savefig(o, dpi=dpi, bbox_inches='tight')
+        fig.savefig(o, dpi=dpi, bbox_inches=bbox_inches)
         if not silent:
             print(f"{ind2}圖像已保存至: {o}")
     
