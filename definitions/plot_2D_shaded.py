@@ -258,7 +258,7 @@ def plot_2D_shaded(array, x=None, y=None,
                    # output
                    figsize=(6, 5), 
                    o=None, 
-                   dpi=300, 
+                   dpi=200, 
                    bbox_inches='tight',   # None, 'tight', Bbox([[0.5, 0.5], [5.5, 4.5]])
                    ax=None, fig=None, 
                    show=True, 
@@ -619,6 +619,7 @@ def plot_2D_shaded(array, x=None, y=None,
             - 常用組合：黑色文字配白色描邊，或白色文字配黑色描邊
             例如：user_info_color='white', user_info_stroke_color='black'   
 
+    v1.18 2025-11-05 調整clevels的選取邏輯
     v1.17.1 2025-11-02 將刻度線移到色條內側. 微調預設參數
                        增加 fig_info 參數，可在 figure 左上角添加標註文字
                        增加 alpha 參數,alpha=0 效果等於不畫色階
@@ -704,6 +705,7 @@ def plot_2D_shaded(array, x=None, y=None,
     import cartopy.mpl.ticker as cticker   
     from datetime import datetime
     import matplotlib.patheffects as patheffects
+    import warnings
     
     # 建立縮排字串
     ind = ' ' * indent
@@ -870,7 +872,7 @@ def plot_2D_shaded(array, x=None, y=None,
     # 創建網格數據
     if x is None and y is None:
         # 沒有提供經緯度,使用索引
-        print(f"{ind2}        create XX and YY by np.meshgrid(np.arange(cols), np.arange(rows)")
+        print(f"{ind2}        create XX and YY by np.meshgrid(np.arange(cols), np.arange(rows))")
         XX, YY = np.meshgrid(np.arange(cols), np.arange(rows))
     elif x is not None and y is not None:
         print(f"{ind2}        create XX and YY from input x and y")
@@ -995,8 +997,9 @@ def plot_2D_shaded(array, x=None, y=None,
         if colorbar_label is not None:
             # 使用者指定的標籤
             if colorbar_label in ['', ' ', 'nolabel', 'None', 'no']:
+                cbar.set_label(" ", fontsize=10)
                 if not silent:
-                    print(f"{ind2}        使用者自訂colorbar_label: nolabel")
+                    print(f"{ind2}        使用者自訂 colorbar_label='no': colorbar_label為空白")
             else:
                 cbar.set_label(colorbar_label, fontsize=10)
                 if not silent:
@@ -1006,10 +1009,12 @@ def plot_2D_shaded(array, x=None, y=None,
             auto_label = f'[{unit_str}]'
             cbar.set_label(auto_label, fontsize=10)
             if not silent:
+                print(f"{ind2}        發現數據帶有單位, 單位: {unit_str}")
                 print(f"{ind2}        自動設定colorbar_label: {auto_label}")
         else:
+            cbar.set_label(" ", fontsize=10)
             if not silent:
-                print(f"{ind2    }    自動設定colorbar_label: 未發現單位，不顯示colorbar_label")
+                print(f"{ind2    }    自動設定colorbar_label: 未發現數據帶有單位，colorbar_label為空白")
     
     # 添加統計信息在圖的左下角
     ng = 3
@@ -1135,10 +1140,10 @@ def plot_2D_shaded(array, x=None, y=None,
             # 如果使用者手動指定網格線位置,覆寫自動生成的位置
             if grid_xticks is not None:
                 xlocs = grid_xticks
-                print(f"{ind2}    user set xlocs: {xlocs}")
+                print(f"{ind2}    user set grid_xticks, xlocs changed: {xlocs}")
             if grid_yticks is not None:
                 ylocs = grid_yticks
-                print(f"{ind2}    user set ylocs: {ylocs}")
+                print(f"{ind2}    user set grid_yticks, ylocs changed: {ylocs}")
 
             gl = ax.gridlines(
                 draw_labels={'bottom': 'x', 'left': 'y'},  # 明確指定標籤位置
@@ -1291,7 +1296,7 @@ def plot_2D_shaded(array, x=None, y=None,
             # 自動設定scale（如果沒有提供）
             if vscale is None:                
                 #vscale = float(f"{vec_max * 4:.3g}")  # 取3位有效數字
-                vscale = float(f"{np.percentile(wind_speed, 97) * 4:.3g}")  # 取3位有效數字
+                vscale = float(f"{np.nanpercentile(wind_speed, 97) * 4:.3g}")  # 取3位有效數字
                 if not silent:
                     print(f"{ind2}    自動設定vscale: {vscale:.3g}")
             else:
@@ -1300,7 +1305,7 @@ def plot_2D_shaded(array, x=None, y=None,
             
             # 自動設定參考長度（如果沒有提供）
             if vref is None:
-                vref = float(f"{vec_max:.2g}")  # 取兩位有效數字
+                vref = float(f"{vec_max * 0.95:.2g}")  # 取兩位有效數字
                 if not silent:
                     print(f"{ind2}    自動設定vref: {vref:.2g}")
             else:
@@ -1568,17 +1573,36 @@ def plot_2D_shaded(array, x=None, y=None,
                 if clevels_current is None and cints_current is None:
                     n_bins = int(np.ceil(np.log2(len(cnt_valid)) + 1))
                     all_levels = MaxNLocator(nbins=n_bins).tick_values(
-                        np.max(cnt_valid)-1, np.min(cnt_valid)+1)
-                    clevels1 = all_levels
-                    clevels2 = all_levels[::4]
+                        np.min(cnt_valid), np.max(cnt_valid))
+                    clevels1 = all_levels   
+                    if np.min(cnt_valid) < 0 < np.max(cnt_valid):
+                        if 0 not in all_levels:
+                            warnings.warn("Warning, all_levels 未包含0 !")           
+                    # 如果clevels1中有0，調整起始索引使clevels2包含0
+                    if 0 in clevels1:
+                        zero_idx = np.where(clevels1 == 0)[0][0]  # 找到0的索引
+                        start_idx = zero_idx % 4  # 計算起始索引，使得跳4時會包含0
+                        clevels2 = all_levels[start_idx::4]
+                    else:
+                        clevels2 = all_levels[::4]
+                    print(f"{ind2}        auto clevels setting. all_levels: {all_levels}")
 
                 elif clevels_current is None and cints_current is not None:
-                    cmaxs = np.ceil(np.max(cnt_valid) / np.array(cints_current)) * np.array(cints_current) + 1  
+                    cmaxs = np.ceil(np.max(cnt_valid) / np.array(cints_current)) * np.array(cints_current)
                     cmins = np.floor(np.min(cnt_valid) / np.array(cints_current)) * np.array(cints_current)  
-                    clevels1 = np.arange(cmins[0], cmaxs[0], cints_current[0])
-                    clevels2 = np.arange(cmins[1], cmaxs[1], cints_current[1])
+                    
+                    n_steps1 = int(np.round((cmaxs[0] - cmins[0]) / cints_current[0]))
+                    n_steps2 = int(np.round((cmaxs[1] - cmins[1]) / cints_current[1]))
+                                        
+                    clevels1 = np.linspace(cmins[0], cmaxs[0], n_steps1 + 1)
+                    clevels2 = np.linspace(cmins[1], cmaxs[1], n_steps2 + 1)
+
+                    # 四捨五入消除浮點數誤差
+                    n_clevels_round = 5
+                    clevels1 = np.round(clevels1, n_clevels_round)
+                    clevels2 = np.round(clevels2, n_clevels_round)
                     if not silent:
-                        print(f"{ind2}        等值線間隔: {cints_current}")
+                        print(f"{ind2}        user set cints. 等值線間隔: {cints_current} (clevels四捨五入至小數點後{n_clevels_round}位)")
                 else:
                     clevels1, clevels2 = clevels_current
                
