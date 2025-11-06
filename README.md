@@ -23,6 +23,7 @@
 
 
 ## WRF tools
-[wrf-tool](https://github.com/YakultSmoothie/wrf-tool/edit/main/README.md)
+[wrf-tools](https://github.com/YakultSmoothie/wrf-tool/blob/main/README.md)
+
 
 
