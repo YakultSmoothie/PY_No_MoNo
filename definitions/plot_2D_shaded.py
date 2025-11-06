@@ -1,7 +1,7 @@
 #--------------------------------------------
 # 使用者資訊標註的功能
 #--------------------------------------------
-def add_user_info_text(ax, user_info, 
+def _add_user_info_text(ax, user_info, 
                        user_info_loc='upper right',
                        user_info_fontsize=6,
                        user_info_offset=(0.00, 0.00),
@@ -113,7 +113,7 @@ def add_user_info_text(ax, user_info,
 #--------------------------------------------
 # 向量場圖例繪製功能
 #--------------------------------------------
-def add_vector_quiverkey(ax, qu, qk_x, qk_y, vref, vector_unit_str,
+def _add_vector_quiverkey(ax, qu, qk_x, qk_y, vref, vector_unit_str,
                         vx_bai=None, vy_bai=None,
                         vkey_labelpos='W',
                         color_quiverkey='black',
@@ -335,6 +335,7 @@ def plot_2D_shaded(array, x=None, y=None,
                    cwidth=(0.8, 2.0), 
                    ctype=('-', '-'), cntype=('--', '--'), 
                    clab=(False, True),
+                   clab_fontweight=(500, 500),  # 新增參數
                    czorder=None,  
                    
                    silent=False
@@ -558,6 +559,11 @@ def plot_2D_shaded(array, x=None, y=None,
         clab (tuple or list of tuple): 是否標示數值(細線, 粗線)，預設(False, True) 只在粗線上標註數值
             - (True, True): 細線和粗線都標註數值
             - (False, False): 都不標註
+        clab_fontweight (tuple or list of tuple): 等值線標籤字重(細線, 粗線)，預設(500, 500)
+            - tuple: 單組等值線的字重，例如：(400, 600)表示細線用400，粗線用600
+            - list of tuple: 多組等值線各自的字重
+            - 常用值：300(細), 400(正常), 500(稍粗), 600(粗), 700(很粗), 800(極粗)
+        例如：[(400, 600), (500, 700)]
         czorder (int or list of int or None): 等值線的繪圖層級(zorder)，預設None
             - None: 自動設定，第一組為70，之後每組+1 (70, 71, 72, ...)
             - int: 單一值，所有等值線使用相同zorder
@@ -619,7 +625,8 @@ def plot_2D_shaded(array, x=None, y=None,
             - 常用組合：黑色文字配白色描邊，或白色文字配黑色描邊
             例如：user_info_color='white', user_info_stroke_color='black'   
 
-    v1.18 2025-11-05 調整clevels的選取邏輯
+    v1.18 2025-11-06 調整clevels的選取邏輯
+                     新增參數clab_fontweight 
     v1.17.1 2025-11-02 將刻度線移到色條內側. 微調預設參數
                        增加 fig_info 參數，可在 figure 左上角添加標註文字
                        增加 alpha 參數,alpha=0 效果等於不畫色階
@@ -1425,7 +1432,7 @@ def plot_2D_shaded(array, x=None, y=None,
                 vkey_color = 'black'       
         
         # 繪製主體quiverkey - 使用新函數
-        quiverkey_list = add_vector_quiverkey(
+        quiverkey_list = _add_vector_quiverkey(
             ax=ax, qu=qu, 
             qk_x=qk_x, qk_y=qk_y, 
             vref=vref, 
@@ -1500,6 +1507,7 @@ def plot_2D_shaded(array, x=None, y=None,
         ctype_list = _make_list(ctype, n_contours, 'ctype')
         cntype_list = _make_list(cntype, n_contours, 'cntype')
         clab_list = _make_list(clab, n_contours, 'clab')
+        clab_fontweight_list = _make_list(clab_fontweight, n_contours, 'clab_fontweight')  # 新增
         czorder_list = _make_list(czorder, n_contours, 'czorder')  
                 
         # 初始化統計資訊字典
@@ -1519,6 +1527,7 @@ def plot_2D_shaded(array, x=None, y=None,
             ctype_current = ctype_list[i_cnt]
             cntype_current = cntype_list[i_cnt]
             clab_current = clab_list[i_cnt]
+            clab_fontweight_current = clab_fontweight_list[i_cnt]  # 新增
             #czorder_list = czorder_list[i_cnt]
             
             # 處理等值線數據（支援xarray和pint）
@@ -1652,7 +1661,7 @@ def plot_2D_shaded(array, x=None, y=None,
                                            fmt=lambda x: f'{x:g}' if x >= 0 else f'–{abs(x):g}',
                                            inline_spacing=1, zorder=zorder_base+6)
                         for label in labels1:
-                            label.set_fontweight(500)
+                            label.set_fontweight(clab_fontweight_current[0])  # 修改：使用參數
                             label.set_fontsize(10)
                 
                 # 繪製粗線等值線
@@ -1674,8 +1683,8 @@ def plot_2D_shaded(array, x=None, y=None,
                         labels2 = ax.clabel(contours2, inline=True, fontsize=10,
                                            fmt=lambda x: f'{x:g}' if x >= 0 else f'–{abs(x):g}',
                                            inline_spacing=1, zorder=zorder_base+6)
-                        for label in labels2:
-                            label.set_fontweight(500)
+                        for label in labels2:                            
+                            label.set_fontweight(clab_fontweight_current[1])  # 修改：使用參數
                             label.set_fontsize(10)
 
                 # 儲存等值線levels到統計資訊
@@ -1774,7 +1783,7 @@ def plot_2D_shaded(array, x=None, y=None,
         if isinstance(user_info, list) and len(user_info) > 0 and isinstance(user_info[0], dict):
             # 多組設定，每組是一個dict
             for info_dict in user_info:
-                add_user_info_text(ax, 
+                _add_user_info_text(ax, 
                                  info_dict.get('text'),
                                  user_info_loc=info_dict.get('loc', user_info_loc),
                                  user_info_fontsize=info_dict.get('fontsize', user_info_fontsize),
@@ -1786,7 +1795,7 @@ def plot_2D_shaded(array, x=None, y=None,
                                  indent=indent)
         else:
             # 單組設定
-            add_user_info_text(ax, user_info,
+            _add_user_info_text(ax, user_info,
                               user_info_loc=user_info_loc,
                               user_info_fontsize=user_info_fontsize,
                               user_info_offset=user_info_offset,
