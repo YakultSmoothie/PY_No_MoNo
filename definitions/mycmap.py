@@ -6,6 +6,32 @@ Custom colormaps for meteorological visualization
 import numpy as np
 from matplotlib.colors import ListedColormap, BoundaryNorm
 
+def _mycolors(colors_name):
+    if colors_name == 'rain_colors':
+        # Colors based on CWA quantitative precipitation forecast. 
+        # Based on Taiwan Central Weather Administration (CWA) color schemes
+        colors = [
+            '#FFFFFF',  #0  
+            '#C9C9C9',  #1 
+            '#9EFDFF',  #2
+            '#01D2FD',  #6
+            '#00A6FC',  #10
+            '#0177FD',  #15
+            '#26A21C',  #20 
+            '#00F92F',  #30 
+            '#FEFD31',  #40 
+            '#FFD328',  #50
+            '#FFA720',  #70 
+            '#FF2B06',  #90 
+            '#D92203',  #110 
+            '#AA1800',  #130 
+            '#AB20A4',  #150 
+            '#DC2DD2',  #200 
+            '#FF38FB',  #300 
+            '#F6D5FD',  #>300
+        ]
+    return colors
+
 def mycmap(cmap_name='rain300'):
     """
     Get custom colormap, levels, and normalization for meteorological data
@@ -28,58 +54,17 @@ def mycmap(cmap_name='rain300'):
     
     """
     
+    # set colors and levels 
     if cmap_name == 'rain300':
-        # Colors based on CWA quantitative precipitation forecast. 
-        # Based on Taiwan Central Weather Administration (CWA) color schemes
         # 18 colors, 17 levels,
-        colors = [
-            '#FFFFFF',  #0  
-            '#C9C9C9',  #1 
-            '#9EFDFF',  #2
-            '#01D2FD',  #6
-            '#00A6FC',  #10
-            '#0177FD',  #15
-            '#26A21C',  #20 
-            '#00F92F',  #30 
-            '#FEFD31',  #40 
-            '#FFD328',  #50
-            '#FFA720',  #70 
-            '#FF2B06',  #90 
-            '#D92203',  #110 
-            '#AA1800',  #130 
-            '#AB20A4',  #150 
-            '#DC2DD2',  #200 
-            '#FF38FB',  #300 
-            '#F6D5FD',  #>300
-        ]
-        
+        colors = _mycolors('rain_colors')        
         levels = np.array([  0,   1,   2,   6,  10,
                             15,  20,  30,  40,  50,
                             70,  90, 110, 130, 150,
                            200, 300])
         
     elif cmap_name == 'rain900':
-        colors = [
-            '#FFFFFF',   
-            '#C9C9C9',  
-            '#9EFDFF', 
-            '#01D2FD', 
-            '#00A6FC', 
-            '#0177FD', 
-            '#26A21C',  
-            '#00F92F',  
-            '#FEFD31',  
-            '#FFD328', 
-            '#FFA720',  
-            '#FF2B06',  
-            '#D92203', 
-            '#AA1800', 
-            '#AB20A4', 
-            '#DC2DD2', 
-            '#FF38FB', 
-            '#F6D5FD', 
-        ]
-        
+        colors = _mycolors('rain_colors')       
         levels = np.array([0, 3, 6, 18, 30, 45, 60, 90, 120, 
                            150, 210, 270, 330, 390, 450, 600, 900])
     
