@@ -37,8 +37,8 @@ def _auto_grid_interval(XX, YY, target_divisions=4, silent=False, indent=0):
     lat_interval = find_nice_interval(lat_range, target_divisions)
     
     if not silent:
-        #print(f"{ind2}    數據範圍: 經度 {np.nanmin(XX):.2f}°–{np.nanmax(XX):.2f}° (跨度 {lon_range:.2f}°)")
-        #print(f"{ind2}    數據範圍: 緯度 {np.nanmin(YY):.2f}°–{np.nanmax(YY):.2f}° (跨度 {lat_range:.2f}°)")
+        print(f"{ind2}    數據範圍: 經度 {np.nanmin(XX):.2f}°–{np.nanmax(XX):.2f}° (跨度 {lon_range:.2f}°)")
+        print(f"{ind2}    數據範圍: 緯度 {np.nanmin(YY):.2f}°–{np.nanmax(YY):.2f}° (跨度 {lat_range:.2f}°)")
         print(f"{ind2}    自動設定網格間隔(_auto_grid_interval): ")
     
     return (lon_interval, lat_interval)
@@ -303,7 +303,7 @@ def plot_2D_shaded(array, x=None, y=None,
                    # output
                    figsize=(6, 5), 
                    o=None, 
-                   dpi=200, 
+                   dpi=180, 
                    bbox_inches='tight',   # None, 'tight', Bbox([[0.5, 0.5], [5.5, 4.5]])
                    ax=None, fig=None, 
                    show=True, 
@@ -342,7 +342,7 @@ def plot_2D_shaded(array, x=None, y=None,
                    invert_xaxis=False, invert_yaxis=False,
                    
                    # coastline
-                   coastline_color=('black', 'yellow'), 
+                   coastline_color=('black', 'yellow'),  # When coastline_color=None, do not draw coastline
                    coastline_width=(1.0, 0), 
                    coastline_resolution='50m',
 
@@ -359,7 +359,7 @@ def plot_2D_shaded(array, x=None, y=None,
                    grid_alpha = 0.6, 
                    grid_zordwr = 9, 
                    grid_color = 'gray', 
-                   gxylim=None,
+                   gxylim=None,   # 例如：(100, 140, 15, 45)
 
                    # vector
                    vx=None, vy=None, 
@@ -381,6 +381,8 @@ def plot_2D_shaded(array, x=None, y=None,
                    ctype=('-', '-'), cntype=('--', '--'), 
                    clab=(False, True),
                    clab_fontweight=(5, 5),  # 新增參數
+                   clab_manuals1=False,     # 標籤位置
+                   clab_manuals2=False,
                    czorder=None,  
                    
                    silent=False
@@ -608,7 +610,15 @@ def plot_2D_shaded(array, x=None, y=None,
             - tuple: 單組等值線的字重，例如：(4, 6)表示細線用4，粗線用6
             - list of tuple: 多組等值線各自的字重
             - 常用值：3(細), 4(正常), 5(稍粗), 6(粗), 7(很粗), 8(極粗)
-        例如：[(4, 6), (5, 7)]
+                例如：[(4, 6), (5, 7)]
+        clab_manuals1 (bool or list of tuples): 細線標籤位置，預設 False
+            - False: 使用預設自動標籤位置
+            - list of tuples: 手動指定標籤座標 (x, y)
+            - 例如：[(120, 20), (110, 30), (140, 10)]
+        clab_manuals2 (bool or list of tuples): 粗線標籤位置，預設 False
+            - False: 使用預設自動標籤位置
+            - list of tuples: 手動指定標籤座標 (x, y)
+            - 例如：[(120, 20), (110, 30), (140, 10)]
         czorder (int or list of int or None): 等值線的繪圖層級(zorder)，預設None
             - None: 自動設定，第一組為70，之後每組+1 (70, 71, 72, ...)
             - int: 單一值，所有等值線使用相同zorder
@@ -670,9 +680,14 @@ def plot_2D_shaded(array, x=None, y=None,
             - 常用組合：黑色文字配白色描邊，或白色文字配黑色描邊
             例如：user_info_color='white', user_info_stroke_color='black'   
 
-    v1.19 2025-11-08 網格間隔自動設定邏輯優化
+    v1.19 2025-11-09 網格間隔自動設定邏輯優化
                         - 新增 _auto_grid_interval 函數：根據數據範圍自動決定網格間隔
                           作用於grid_type == 2 和 grid_type == 3 
+                     增加 clab_manuals1 and clab_manuals2 參數
+                        - False 表示使用預設clab標籤位置
+                        - 輸入 List of tuples containing (x, y) coordinates 會在這些位置貼標籤
+                            - 例如 clab_manuals2 = [(120, 20), (110, 30), (140, 10)] 
+                     等值線不再以多變數等值線進行開發
     v1.18 2025-11-07 調整clevels的選取邏輯
                         新增參數clab_fontweight 
                         調整 自動設定 vref 的邏輯
@@ -1129,9 +1144,19 @@ def plot_2D_shaded(array, x=None, y=None,
             from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
             print(f"{ind2}    grid type: gridlines with labels (for PlateCarree)")   
 
-            # 如果沒有指定網格間隔,根據海岸線解析度自動設定
+            # 如果沒有指定網格間隔,根據海岸線解析度自動設定            
             if grid_int is None:
-                grid_int = _auto_grid_interval(XX, YY, silent=silent, indent=indent)                
+                try:
+                    # 優先嘗試根據資料範圍自動計算網格間隔
+                    if gxylim is not None:
+                        grid_int = _auto_grid_interval(np.array([gxylim[0], gxylim[1]]), 
+                                                    np.array([gxylim[2], gxylim[3]]),
+                                                    silent=silent, indent=indent)                
+                    else:
+                        grid_int = _auto_grid_interval(XX, YY, silent=silent, indent=indent)
+                except Exception:
+                    # 如果自動計算失敗,則使用預設的海岸線解析度對應值
+                    grid_int = {'10m': (2, 2), '50m': (10, 10), '110m': (30, 30)}.get(coastline_resolution, (10, 10))        
             
             xlocs = np.sort(np.concatenate([-np.arange(grid_int[0], 361, grid_int[0])[::-1], np.arange(0, 361, grid_int[0])]))
             ylocs = np.sort(np.concatenate([-np.arange(grid_int[1], 91, grid_int[1])[::-1], np.arange(0, 91, grid_int[1])]))            
@@ -1173,12 +1198,19 @@ def plot_2D_shaded(array, x=None, y=None,
 
         elif (grid_type == None and type(projection).__name__ == 'LambertConformal') or (grid_type == 2) or (grid_type == 'Lambert'):            
             print(f"{ind2}    grid type: gridlines with labels (for LambertConformal)")
-            # 設定經緯度網格線 - for ccrs.LambertConformal
-
-            # 如果沒有指定網格間隔,根據海岸線解析度自動設定
+            # 設定經緯度網格線 - for ccrs.LambertConformal            
             if grid_int is None:
-                grid_int = _auto_grid_interval(XX, YY, silent=silent, indent=indent)
-                # grid_int = {'10m': (2, 2), '50m': (10, 10), '110m': (30, 30)}.get(coastline_resolution, (10, 10))
+                try:
+                    # 優先嘗試根據資料範圍自動計算網格間隔
+                    if gxylim is not None:
+                        grid_int = _auto_grid_interval(np.array([gxylim[0], gxylim[1]]), 
+                                                    np.array([gxylim[2], gxylim[3]]),
+                                                    silent=silent, indent=indent)                
+                    else:
+                        grid_int = _auto_grid_interval(XX, YY, silent=silent, indent=indent)
+                except Exception:
+                    # 如果自動計算失敗,則使用預設的海岸線解析度對應值
+                    grid_int = {'10m': (2, 2), '50m': (10, 10), '110m': (30, 30)}.get(coastline_resolution, (10, 10))
 
             # 生成全球網格線位置
             xlocs_all = np.sort(np.concatenate([-np.arange(grid_int[0], 361, grid_int[0])[::-1], np.arange(0, 361, grid_int[0])]))
@@ -1711,9 +1743,11 @@ def plot_2D_shaded(array, x=None, y=None,
                     if clab_current[0]:
                         labels1 = ax.clabel(contours1, inline=True, fontsize=10,
                                            fmt=lambda x: f'{x:g}' if x >= 0 else f'–{abs(x):g}',
+                                           manual=clab_manuals1,
                                            inline_spacing=1, zorder=zorder_base+6)
                         for label in labels1:
-                            label.set_fontweight(clab_fontweight_current[0]*100)  # 修改：使用參數
+                            # 對每個標籤逐一進行修改                       
+                            label.set_fontweight(clab_fontweight_current[0]*100)  # 根據測試, 只支援200～900
                             label.set_fontsize(10)
                 
                 # 繪製粗線等值線
@@ -1733,10 +1767,12 @@ def plot_2D_shaded(array, x=None, y=None,
                     
                     if clab_current[1]:
                         labels2 = ax.clabel(contours2, inline=True, fontsize=10,
-                                           fmt=lambda x: f'{x:g}' if x >= 0 else f'–{abs(x):g}',
+                                           fmt=lambda x: f'{x:g}' if x >= 0 else f'–{abs(x):g}',                               
+                                           manual=clab_manuals2,
                                            inline_spacing=1, zorder=zorder_base+6)
-                        for label in labels2:                            
-                            label.set_fontweight(clab_fontweight_current[1]*100)  # 修改：使用參數
+                        for label in labels2:     
+                            # 對每個標籤逐一進行修改                       
+                            label.set_fontweight(clab_fontweight_current[1]*100)  # 使用參數
                             label.set_fontsize(10)
 
                 # 儲存等值線levels到統計資訊
