@@ -381,8 +381,8 @@ def plot_2D_shaded(array, x=None, y=None,
                    ctype=('-', '-'), cntype=('--', '--'), 
                    clab=(False, True),
                    clab_fontweight=(5, 5),  # 新增參數
-                   clab_manuals1=False,     # 標籤位置
-                   clab_manuals2=False,
+                   clab_manuals1: list[tuple[float, float]] | bool =False,     # 標籤位置
+                   clab_manuals2: list[tuple[float, float]] | bool =False,
                    czorder=None,  
                    
                    silent=False
