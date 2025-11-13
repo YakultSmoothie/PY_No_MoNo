@@ -6,7 +6,9 @@ __all__ = [
     'plot_2D_shaded',
     'draw_ol',  
     'add_user_info_text',
-    'mycmap'
+    'mycmap',
+    'geo_to_proj_coords',
+    'get_spatial_mask',
 ]
 
 # [2] 從子模組導入內容
@@ -20,6 +22,8 @@ from .plot_2D_shaded import *
 from .draw_ol import *
 from .add_user_info_text import *
 from .mycmap import *
+from .geo_to_proj_coords import *
+from .get_spatial_mask import *
 
 # 設定別名，
 # 這些別名也會存在於 definitions 命名空間中，但不在 __all__ 裡，
