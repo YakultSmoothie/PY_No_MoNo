@@ -5,7 +5,7 @@
 | **==== Visualization ====** |
 | `plot_2D_shaded(array[, ...]) ` | Fast 2D array visualization with automatic statistics.<br>Multi-format input is supported | [GitHub](https://github.com/YakultSmoothie/PY_No_MoNo/blob/main/definitions/plot_2D_shaded.py) |
 | `figs_to_mp4(fig_list, [, ...])` | Convert a list of matplotlib figures to MP4 video | [GitHub](https://github.com/YakultSmoothie/PY_No_MoNo/blob/main/definitions/def_figs_to_mp4.py) |
-| `add_user_info_text(ax, user_info[, ...])` | Add text annotations to plots with flexible positioning, multi-line support | [GitHub](https://github.com/YakultSmoothie/PY_No_MoNo/blob/main/definitions/add_user_info_text.py) [UpNote](https://getupnote.com/share/notes/xf7xZVKNuQNiC02vUdCCJmXIxIL2/019a82b5-87db-727d-ae05-026c93dc8c96)|
+| `add_user_info_text(ax, user_info[, ...])` | Add text annotations to plots with preset positions, multi-line support | [GitHub](https://github.com/YakultSmoothie/PY_No_MoNo/blob/main/definitions/add_user_info_text.py) [UpNote](https://getupnote.com/share/notes/xf7xZVKNuQNiC02vUdCCJmXIxIL2/019a82b5-87db-727d-ae05-026c93dc8c96)|
 | **==== Array ====** |
 | `array_info(data[,...])` | Display comprehensive array information | [GitHub](https://github.com/YakultSmoothie/PY_No_MoNo/blob/main/definitions/def_show_array_info.py) |
 | `quantity_to_xarray(quantity, template[, name, description])` | Convert pint Quantity to xarray DataArray with unit preservation | [GitHub](https://github.com/YakultSmoothie/PY_No_MoNo/blob/main/definitions/def_quantity_to_xarray.py) |
