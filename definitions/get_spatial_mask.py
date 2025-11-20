@@ -65,6 +65,8 @@ def get_spatial_mask(
     
     Version History
     ---------------
+    v1.0.1 2025-11-20 YakultSmoothie
+        修改邊界條件為嚴格不等式(> 和 <),並向外延伸一格,含邊界保護
     v1.0 2025-11-13 YakultSmoothie
         初始版本,支援1D/2D輸入、單位處理、自動擴充
     """
@@ -134,37 +136,75 @@ def get_spatial_mask(
     
     # ========== 步驟6: 建立遮罩 ==========
     mask = (
-        (lons_data >= lon_min) & 
-        (lons_data <= lon_max) & 
-        (lats_data >= lat_min) & 
-        (lats_data <= lat_max)
+        (lons_data > lon_min) & 
+        (lons_data < lon_max) & 
+        (lats_data > lat_min) & 
+        (lats_data < lat_max)
     )
-    
+
     n_total = mask.size
     n_selected = mask.sum()
     percentage = 100.0 * n_selected / n_total if n_total > 0 else 0.0
-    
-    print(f"    遮罩統計: {n_selected}/{n_total} 個點 ({percentage:.1f}%)")
-    
-    # ========== 步驟7: 獲取索引範圍 ==========
+
+    # print(f"    遮罩統計(延伸前): {n_selected}/{n_total} 個點 ({percentage:.1f}%)")
+
+    # ========== 步驟7: 獲取索引範圍並向外延伸一格 ==========
     # 找出每一列(緯度)是否有任何符合的點
     # 找出每一行(經度)是否有任何符合的點
     x_indices = np.where(mask.any(axis=0))[0]  # 經度方向(列)
     y_indices = np.where(mask.any(axis=1))[0]  # 緯度方向(行)
-    
-    # ========== 步驟8: 建立切片 ==========
+
+    # ========== 步驟8: 建立切片(向外延伸一格) ==========
     if len(x_indices) > 0 and len(y_indices) > 0:
-        x_slice = slice(int(x_indices[0]), int(x_indices[-1]) + 1)
-        y_slice = slice(int(y_indices[0]), int(y_indices[-1]) + 1)
+        # 取得原始範圍
+        x_start = int(x_indices[0])
+        x_end = int(x_indices[-1])
+        y_start = int(y_indices[0])
+        y_end = int(y_indices[-1])
         
-        print(f"    索引範圍:")
-        print(f"        X (經度): [{x_indices[0]}, {x_indices[-1]}] "
-              f"共 {len(x_indices)} 個索引")
-        print(f"        Y (緯度): [{y_indices[0]}, {y_indices[-1]}] "
-              f"共 {len(y_indices)} 個索引")
+        # 向外延伸一格(注意邊界)
+        x_start_extended = max(0, x_start - 1)
+        x_end_extended = min(lons_data.shape[1] - 1, x_end + 1)
+        y_start_extended = max(0, y_start - 1)
+        y_end_extended = min(lats_data.shape[0] - 1, y_end + 1)
+        
+        # 建立延伸後的切片
+        x_slice = slice(x_start_extended, x_end_extended + 1)
+        y_slice = slice(y_start_extended, y_end_extended + 1)
+        
+        # 更新 indices 為延伸後的範圍
+        x_indices = np.arange(x_start_extended, x_end_extended + 1)
+        y_indices = np.arange(y_start_extended, y_end_extended + 1)
+        
+        # 更新遮罩為延伸後的範圍
+        mask_extended = np.zeros_like(mask, dtype=bool)
+        mask_extended[y_start_extended:y_end_extended+1, 
+                    x_start_extended:x_end_extended+1] = True
+        
+        n_selected_extended = mask_extended.sum()
+        percentage_extended = 100.0 * n_selected_extended / n_total
+
+        # 計算延伸後區域的實際經緯度範圍
+        lon_min_actual = lons_data[y_start_extended:y_end_extended+1, 
+                                    x_start_extended:x_end_extended+1].min()
+        lon_max_actual = lons_data[y_start_extended:y_end_extended+1, 
+                                    x_start_extended:x_end_extended+1].max()
+        lat_min_actual = lats_data[y_start_extended:y_end_extended+1, 
+                                    x_start_extended:x_end_extended+1].min()
+        lat_max_actual = lats_data[y_start_extended:y_end_extended+1, 
+                                    x_start_extended:x_end_extended+1].max()
+        
+        print(f"    遮罩統計: {n_selected_extended}/{n_total} 個點 ({percentage_extended:.1f}%)")
+        print(f"    索引範圍(延伸後):")
+        print(f"        X (經度): [{lon_min_actual:g}, {lon_max_actual:g}] 共 {len(x_indices)} 個索引")
+        print(f"        Y (緯度): [{lat_min_actual:g}, {lat_max_actual:g}] 共 {len(y_indices)} 個索引")
         print(f"    切片物件:")
-        print(f"        x_slice = slice({x_indices[0]}, {x_indices[-1]+1})")
-        print(f"        y_slice = slice({y_indices[0]}, {y_indices[-1]+1})")
+        print(f"        x_slice = slice({x_start_extended}, {x_end_extended+1})")
+        print(f"        y_slice = slice({y_start_extended}, {y_end_extended+1})")
+        
+        # 將延伸後的遮罩取代原本的遮罩
+        mask = mask_extended
+    
     else:
         # 如果沒有符合的點,返回空切片
         x_slice = slice(0, 0)
@@ -193,7 +233,8 @@ def main():
     
     lons_1d = np.linspace(118, 123, 100)
     lats_1d = np.linspace(22, 26, 80)
-    extent_test1 = (119.5, 121.5, 23.5, 24.5)
+    extent_test1 = (119.5, 121.5, 23.5, 24.5)    
+    print(f"extent_test1 = {extent_test1}")
     
     mask1, x_slice1, y_slice1, x_idx1, y_idx1 = get_spatial_mask(
         lons_1d, lats_1d, extent_test1
@@ -245,18 +286,22 @@ def main():
     print("-"*80)
     
     # 4a: 區域完全在網格外
+    print("區域完全在網格外")
     extent_outside = (125, 130, 30, 35)
+    print(f"extent_outside = {extent_outside}")
     mask_out, x_slice_out, y_slice_out, _, _ = get_spatial_mask(
         lons_1d, lats_1d, extent_outside
     )
-    print(f"    區域在網格外: 遮罩總數 = {mask_out.sum()}")
+    print(f"區域在網格外: 遮罩總數 = {mask_out.sum()}")
     
     # 4b: 區域覆蓋整個網格
+    print("區域覆蓋超出整個網格")
     extent_full = (117, 124, 21, 27)
+    print(f"extent_full = {extent_full}")
     mask_full, x_slice_full, y_slice_full, _, _ = get_spatial_mask(
         lons_1d, lats_1d, extent_full
     )
-    print(f"    區域覆蓋全網格: 遮罩總數 = {mask_full.sum()}/{mask_full.size}")
+    print(f"區域覆蓋全網格: 遮罩總數 = {mask_full.sum()}/{mask_full.size}")
     
     # ========== 視覺化 ==========
     print("\n【視覺化】繪製遮罩與切片範圍")
@@ -272,7 +317,7 @@ def main():
         extent_test1[1] - extent_test1[0],
         extent_test1[3] - extent_test1[2],
         fill=False, edgecolor='red', linewidth=2, label='Target Domain'
-    ))
+    ))  # draw a red box
     axes[0].set_xlabel('Longitude (°E)')
     axes[0].set_ylabel('Latitude (°N)')
     axes[0].set_title('Mask Distribution')
