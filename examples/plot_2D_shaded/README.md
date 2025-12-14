@@ -15,18 +15,18 @@ Fast 2D array visualization with automatic statistics and multi-format input sup
 
 ## 📚 Examples
 
-### Example 1: Basic Usage
-Quick start guide covering basic visualization with different input formats.
+### Example 1: 主圖之上增加參考線與手動控制等值線標籤位置
+實作圓形參考線疊加與精確控制 Clabel 位置及樣式
 
-**Link**: [View on UpNote](https://getupnote.com/share/notes/xf7xZVKNuQNiC02vUdCCJmXIxIL2/019b1bb3-794d-7588-8f74-4805fc460cf9)
+**Link**: [UpNote](https://getupnote.com/share/notes/xf7xZVKNuQNiC02vUdCCJmXIxIL2/019b1bb3-794d-7588-8f74-4805fc460cf9)
 
 
 **---**
 
-### Example 2: Advanced Features
-Advanced usage including map projections, coordinate handling, and custom styling.
+### Example 2: 複數子圖
+實現多子圖佈局中的顏色映射共享與剖面分析
 
-**Link**: [View on UpNote](https://getupnote.com/share/notes/xf7xZVKNuQNiC02vUdCCJmXIxIL2/019ae71d-a5e5-737a-9635-40fbe22120f0)
+**Link**: [UpNote](https://getupnote.com/share/notes/xf7xZVKNuQNiC02vUdCCJmXIxIL2/019ae71d-a5e5-737a-9635-40fbe22120f0)
 
 
 
@@ -53,6 +53,7 @@ Advanced usage including map projections, coordinate handling, and custom stylin
 - [`add\_user\_info\_text()`](https://github.com/YakultSmoothie/PY\_No\_MoNo/blob/main/definitions/add\_user\_info\_text.py) - Add annotations to plots
 
 - [`figs\_to\_mp4()`](https://github.com/YakultSmoothie/PY\_No\_MoNo/blob/main/definitions/def\_figs\_to\_mp4.py) - Create animations from figures
+
 
 
 
