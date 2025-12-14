@@ -7,9 +7,9 @@ Fast 2D array visualization with automatic statistics and multi-format input sup
 
 ## 📍 Function Location
 
--**Source Code**: [plot\_2D\_shaded.py](https://github.com/YakultSmoothie/PY\_No\_MoNo/blob/main/definitions/plot\_2D\_shaded.py)
+- **Source Code**: [plot\_2D\_shaded.py](https://github.com/YakultSmoothie/PY\_No\_MoNo/blob/main/definitions/plot\_2D\_shaded.py)
 
--**Documentation**: See docstring in source code
+- **Documentation**: See docstring in source code
 
 
 
@@ -53,6 +53,7 @@ Fast 2D array visualization with automatic statistics and multi-format input sup
 - [`add\_user\_info\_text()`](https://github.com/YakultSmoothie/PY\_No\_MoNo/blob/main/definitions/add\_user\_info\_text.py) - Add annotations to plots
 
 - [`figs\_to\_mp4()`](https://github.com/YakultSmoothie/PY\_No\_MoNo/blob/main/definitions/def\_figs\_to\_mp4.py) - Create animations from figures
+
 
 
 
