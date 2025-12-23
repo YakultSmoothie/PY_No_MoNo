@@ -1,4 +1,71 @@
 #--------------------------------------------
+# UV_grid to UV_lonlat
+#--------------------------------------------
+def rotate_vector(ua, va, cosalpha, sinalpha, component="u"):
+    """
+    根據提供的 cosalpha 和 sinalpha 旋轉向量 (ua, va)。
+    處理wrf資料的話，可以使用 wrf.getvar 從 wrfoutput 中提取 cosalpha 與 sinalpha.
+    
+    公式:
+        U_rot = ua * cosalpha - va * sinalpha
+        V_rot = ua * sinalpha + va * cosalpha
+    
+    參數:
+        ua (array-like): 原始向量的 U 分量。可以是 2D (lat, lon) 或 3D (time, lat, lon)。
+        va (array-like): 原始向量的 V 分量。
+        cosalpha (array-like): 旋轉角度的餘弦值。通常為 2D (lat, lon)。
+        sinalpha (array-like): 旋轉角度的正弦值。通常為 2D (lat, lon)。
+        component (str): 指定要返回的分量，"u" 或 "v"。
+                         "u" 對應公式中的 U_rot (例如 East)
+                         "v" 對應公式中的 V_rot (例如 North)
+    
+    Broadcasting 說明:
+        此函式支援 NumPy Broadcasting 機制。
+        如果 ua/va 是 3維 (例如: Time, Lat, Lon)，而 cosalpha/sinalpha 是 2維 (例如: Lat, Lon)，
+        只要最後的維度形狀一致 (Lat, Lon 對應)，程式會自動處理計算。
+    
+    注意:
+        1. 程式會自動提取底層數據以避免 xarray 維度名稱不同導致的對齊錯誤。
+        2. 若輸入數據帶有單位 (例如 xarray 封裝的 Pint Quantity)，輸出結果將會保留單位。
+    
+    返回:
+        array-like: 旋轉後的單一分量結果 (若輸入有單位，則包含單位)
+    """
+    print(f"Run rotate_vector ({component})...")
+
+    # 內部函式：確保輸入轉為數值陣列，但保留單位 (Pint Quantity)
+    # 1. 對於 xarray，使用 .data 而非 .values。
+    #    .values 會強制轉為 numpy (丟失單位)，.data 則會保留底層的 Pint Quantity。
+    #    同時 .data 也不會帶有 xarray 的維度標籤，避免了維度名稱對齊的問題。
+    # 2. 對於 pandas，使用 .values。
+    def _extract_raw_data(arr):
+        if hasattr(arr, 'data'):
+            return arr.data
+        elif hasattr(arr, 'values'):
+            return arr.values
+        return arr
+
+    # 提取數據
+    ua_val = _extract_raw_data(ua)
+    va_val = _extract_raw_data(va)
+    cosalpha_val = _extract_raw_data(cosalpha)
+    sinalpha_val = _extract_raw_data(sinalpha)
+
+    # 統一轉換 component 為小寫以避免大小寫錯誤
+    comp = component.lower()
+    
+    if comp == "u":
+        # 計算旋轉後的 U 分量 (例如 vct_east)
+        return ua_val * cosalpha_val - va_val * sinalpha_val
+        
+    elif comp == "v":
+        # 計算旋轉後的 V 分量 (例如 vct_north)
+        return ua_val * sinalpha_val + va_val * cosalpha_val
+        
+    else:
+        raise ValueError(f"    Component 參數錯誤: '{component}'。請使用 'u' 或 'v'。")
+
+#--------------------------------------------
 # 自動決定網格間隔
 #--------------------------------------------
 def _auto_grid_interval(XX, YY, target_divisions=4, silent=False, indent=0):
@@ -680,6 +747,7 @@ def plot_2D_shaded(array, x=None, y=None,
             - 常用組合：黑色文字配白色描邊，或白色文字配黑色描邊
             例如：user_info_color='white', user_info_stroke_color='black'   
 
+    v1.19.2 2025-12-16 修正 user_info 的讀取方式錯誤
     v1.19.1 2025-11-13 調整 function 導入方式
     v1.19 2025-11-09 網格間隔自動設定邏輯優化
                         - 新增 _auto_grid_interval 函數：根據數據範圍自動決定網格間隔
@@ -1873,7 +1941,8 @@ def plot_2D_shaded(array, x=None, y=None,
             # 多組設定，每組是一個dict
             for info_dict in user_info:
                 add_user_info_text(ax, 
-                                 dict.get('text'),
+                                 #dict.get('text'),
+                                 info_dict.get('text'),  # <--- 修正這裡：將 dict 改為 info_dict
                                  loc=info_dict.get('loc', user_info_loc),
                                  fontsize=info_dict.get('fontsize', user_info_fontsize),
                                  offset=info_dict.get('offset', user_info_offset),
@@ -1896,6 +1965,7 @@ def plot_2D_shaded(array, x=None, y=None,
 
     # ============ After Draw ============
     plt.rcParams['font.sans-serif'] = ['DejaVu Sans', 'Arial', 'sans-serif']
+    #plt.rcParams['font.sans-serif'] = ['WenQuanYi Micro Hei', 'Droid Sans Fallback', 'DejaVu Sans', 'Arial', 'sans-serif']  #使用中文字體會導致長負號顯示錯誤，所以不能使用
     plt.rcParams['axes.unicode_minus'] = True  # 使用長負號
     if not silent:
         print(f"{ind2}Current font: {matplotlib.rcParams['font.sans-serif']}")
