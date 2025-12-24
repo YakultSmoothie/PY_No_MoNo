@@ -27,7 +27,13 @@ Fast 2D array visualization with automatic statistics and multi-format input sup
 - 實現多子圖佈局中的顏色映射共享與剖面分析
 - **Link**: [UpNote](https://getupnote.com/share/notes/xf7xZVKNuQNiC02vUdCCJmXIxIL2/019ae71d-a5e5-737a-9635-40fbe22120f0)
 
-### Example 3: (Coming Soon)
+### Example 3: 時間-緯度剖面圖與動力特徵追蹤 (Time-Lat Cross-section & Feature Tracking)
+- 展示如何利用 plot_2D_shaded 繪製 Hovmöller 圖表，並疊加自動偵測的物理量極值軌跡（如最大渦度線）。
+- - **Code**: [GitHub](https://github.com/YakultSmoothie/PY_No_MoNo/blob/main/examples/plot_2D_shaded/p2d_Example_3.py)
+- **Output**: [GitHub](https://github.com/YakultSmoothie/PY_No_MoNo/blob/main/examples/plot_2D_shaded/p2d_Example_3.png)
+
+### Example 4: (Coming Soon)
+
 
 
 ---
@@ -46,6 +52,7 @@ Fast 2D array visualization with automatic statistics and multi-format input sup
 
 - [`add_user_info_text()`](https://github.com/YakultSmoothie/PY\_No\_MoNo/blob/main/definitions/add\_user\_info\_text.py) - Add annotations to plots
 - [`figs_to_mp4()`](https://github.com/YakultSmoothie/PY\_No\_MoNo/blob/main/definitions/def\_figs\_to\_mp4.py) - Create animations from figures
+
 
 
 
