@@ -1,8 +1,114 @@
 #!/usr/bin/env python3
-#====================================================================================================
-def custom_cross_section(data, start, end, lons, lats, steps=101, method='nearest', buffer_km=1E99, orientation_method='cartesian'):
+# ====================================================================================================
+#  前置def
+# ====================================================================================================
+# 計算剖面線上每個點到起點的距離（公里）
+def haversine_distance(lat1, lon1, lat2, lon2):
+    """計算地球大圓距離（km）"""
+    import numpy as np
+
+    R = 6371.0  # 地球半徑（km）
+    lat1, lon1, lat2, lon2 = map(np.radians, [lat1, lon1, lat2, lon2])
+    dlat = lat2 - lat1
+    dlon = lon2 - lon1
+    a = np.sin(dlat/2)**2 + np.cos(lat1) * np.cos(lat2) * np.sin(dlon/2)**2
+    c = 2 * np.arcsin(np.sqrt(a))
+    return R * c
+
+# 向量化的 Haversine 距離計算
+def haversine_distance_vectorized(lat1, lon1, lat2, lon2):
     """
-    自訂剖面插值函數，適用於 w2nc and ERA5 的 curvilinear grid
+    向量化的 Haversine 距離計算
+    lat1, lon1: 陣列形狀 (n,) - 第一組點
+    lat2, lon2: 陣列形狀 (m,) - 第二組點
+    返回距離矩陣（km），形狀 (m, n)
+    """
+    import numpy as np
+
+    R = 6371.0  # 地球半徑（km）
+    lat1, lon1, lat2, lon2 = map(np.radians, [lat1, lon1, lat2, lon2])
+    
+    # 使用 broadcasting 計算所有組合的距離
+    dlat = lat2[:, np.newaxis] - lat1[np.newaxis, :]
+    dlon = lon2[:, np.newaxis] - lon1[np.newaxis, :]
+    
+    a = (np.sin(dlat/2)**2 + 
+            np.cos(lat1[np.newaxis, :]) * np.cos(lat2[:, np.newaxis]) * np.sin(dlon/2)**2)
+    c = 2 * np.arcsin(np.sqrt(a))
+    return R * c
+
+# 計算剖面指向（相對於正東方向，逆時針為正）
+def calculate_orientation_angle_spherical(lat1, lon1, lat2, lon2):
+    """
+    使用球面三角學計算從點1到點2的指向
+    
+    Returns:
+    --------
+    float : 指向（度）
+        0° = 正東（East）
+        90° = 正北（North）
+        180° = 正西（West）
+        270° = 正南（South）
+    """
+    import numpy as np
+
+    # 轉換為弧度
+    lat1_rad = np.radians(lat1)
+    lon1_rad = np.radians(lon1)
+    lat2_rad = np.radians(lat2)
+    lon2_rad = np.radians(lon2)
+    
+    # 計算經緯度差異
+    dlon = lon2_rad - lon1_rad
+    
+    # 使用球面三角學計算方位角
+    y = np.sin(dlon) * np.cos(lat2_rad)
+    x = np.cos(lat1_rad) * np.sin(lat2_rad) - np.sin(lat1_rad) * np.cos(lat2_rad) * np.cos(dlon)
+    bearing_from_north = np.degrees(np.arctan2(y, x))
+    
+    # 轉換為從東方逆時針的角度(指向)
+    orientation = 90 - bearing_from_north
+    
+    # 確保角度在 0-360 度範圍內
+    orientation = orientation % 360
+    
+    return orientation
+
+def calculate_orientation_angle_cartesian(lat1, lon1, lat2, lon2):
+    """
+    使用笛卡爾座標計算從點1到點2的指向（平面近似）
+    直接使用經緯度差異計算角度
+    
+    Returns:
+    --------
+    float : 指向（度）
+        0° = 正東（East）
+        90° = 正北（North）
+        180° = 正西（West）
+        270° = 正南（South）
+    """
+    import numpy as np
+
+    # 計算經緯度差異
+    dlat = lat2 - lat1
+    dlon = lon2 - lon1
+    
+    # 使用 arctan2 計算角度（從東方逆時針）
+    # 注意：dlon 對應 x 軸（東西向），dlat 對應 y 軸（南北向）
+    orientation = np.degrees(np.arctan2(dlat, dlon))
+    
+    # 確保角度在 0-360 度範圍內
+    orientation = orientation % 360
+    
+    return orientation
+
+# ====================================================================================================
+#  MAIN def
+# ====================================================================================================
+def custom_cross_section(data, start, end, lons, lats, steps=101, method='linear', buffer_km=1E99, orientation_method='cartesian', **kwargs):
+    """
+    自訂剖面插值函數，適用於 w2nc and ERA5 的 curvilinear grid。
+    整合 MetPy 插值功能，支援 Barnes 與 Cressman 分析。
     
     Parameters:
     -----------
@@ -12,11 +118,18 @@ def custom_cross_section(data, start, end, lons, lats, steps=101, method='neares
     lons : xarray.DataArray  經度陣列，dim=-1 是經度
     lats : xarray.DataArray  緯度陣列，dim=-2 是緯度
     steps : int 插值點數
-    method : str  插值方法 ('nearest', 'linear', 'cubic')
+    method : str  插值方法 (interp_type)。
+        SciPy methods: 'linear', 'nearest', 'cubic', 'rbf'
+        MetPy methods: 'natural_neighbor', 'barnes', 'cressman'
+        webpage of metpy.interpolate.interpolate_to_points :
+        https://unidata.github.io/MetPy/latest/api/generated/metpy.interpolate.interpolate_to_points.html#metpy.interpolate.interpolate_to_points
     buffer_km : float 剖面兩側的緩衝區距離（公里），用於預先篩選資料點，預設為不設定遮罩
     orientation_method : str 指向計算方式 ('spherical', 'cartesian')
         'cartesian' : 使用笛卡爾座標，直接計算與經緯度線的交角（平面近似）
         'spherical' : 使用球面三角學計算真實大圓方位角（地球曲率）
+    **kwargs : dict
+        傳遞給 metpy.interpolate.interpolate_to_points 的額外參數。
+        例如: search_radius, minimum_neighbors, gamma, kappa_star, rbf_func, rbf_smooth
     
     Returns:
     --------
@@ -25,17 +138,22 @@ def custom_cross_section(data, start, end, lons, lats, steps=101, method='neares
         如果原始資料有單位,會自動保留
         屬性中包含 'cross_section_orientation_deg' (剖面指向，度)
 
-    v1.1 2025-10-17 YakultSmoothie
+    v1.2 2025-12-24 YakultSmoothie with Gemini3
+        整合 metpy.interpolate.interpolate_to_points 以支援 barnes/cressman 等進階插值
+    v1.1 2025-10-17 YakultSmoothie with Claude
         增加 orientation_method 參數
 
     """
-    from scipy.interpolate import griddata
+    from metpy.interpolate import interpolate_to_points
     import numpy as np
     import xarray as xr
     
-    print(f"Run custom_cross_section ...")
-    print(f"    建立剖面路徑: {steps} 個點; 插值方法: {method}")
+    print(f"Run custom_cross_section (v1.2) ...")
+    print(f"    建立剖面路徑: {steps} 個點")
+    print(f"    插值方法 (Method): {method}")
     print(f"    指向計算方式: {orientation_method}")
+    if kwargs:
+        print(f"    額外參數 (Kwargs): {kwargs}")
     
     # 檢查原始資料是否有單位
     has_units = hasattr(data, 'data') and hasattr(data.data, 'units')
@@ -44,98 +162,6 @@ def custom_cross_section(data, start, end, lons, lats, steps=101, method='neares
     # 建立剖面路徑 - 走經緯方向過去
     lats_path = np.linspace(start[0], end[0], steps)
     lons_path = np.linspace(start[1], end[1], steps)
-    
-    # 計算剖面線上每個點到起點的距離（公里）
-    def haversine_distance(lat1, lon1, lat2, lon2):
-        """計算地球大圓距離（km）"""
-        R = 6371.0  # 地球半徑（km）
-        lat1, lon1, lat2, lon2 = map(np.radians, [lat1, lon1, lat2, lon2])
-        dlat = lat2 - lat1
-        dlon = lon2 - lon1
-        a = np.sin(dlat/2)**2 + np.cos(lat1) * np.cos(lat2) * np.sin(dlon/2)**2
-        c = 2 * np.arcsin(np.sqrt(a))
-        return R * c
-    
-    # 向量化的 Haversine 距離計算
-    def haversine_distance_vectorized(lat1, lon1, lat2, lon2):
-        """
-        向量化的 Haversine 距離計算
-        lat1, lon1: 陣列形狀 (n,) - 第一組點
-        lat2, lon2: 陣列形狀 (m,) - 第二組點
-        返回距離矩陣（km），形狀 (m, n)
-        """
-        R = 6371.0  # 地球半徑（km）
-        lat1, lon1, lat2, lon2 = map(np.radians, [lat1, lon1, lat2, lon2])
-        
-        # 使用 broadcasting 計算所有組合的距離
-        dlat = lat2[:, np.newaxis] - lat1[np.newaxis, :]
-        dlon = lon2[:, np.newaxis] - lon1[np.newaxis, :]
-        
-        a = (np.sin(dlat/2)**2 + 
-             np.cos(lat1[np.newaxis, :]) * np.cos(lat2[:, np.newaxis]) * np.sin(dlon/2)**2)
-        c = 2 * np.arcsin(np.sqrt(a))
-        return R * c
-    
-    # 計算剖面指向（相對於正東方向，逆時針為正）
-    def calculate_orientation_angle_spherical(lat1, lon1, lat2, lon2):
-        """
-        使用球面三角學計算從點1到點2的指向
-        
-        Returns:
-        --------
-        float : 指向（度）
-            0° = 正東（East）
-            90° = 正北（North）
-            180° = 正西（West）
-            270° = 正南（South）
-        """
-        # 轉換為弧度
-        lat1_rad = np.radians(lat1)
-        lon1_rad = np.radians(lon1)
-        lat2_rad = np.radians(lat2)
-        lon2_rad = np.radians(lon2)
-        
-        # 計算經緯度差異
-        dlon = lon2_rad - lon1_rad
-        
-        # 使用球面三角學計算方位角
-        y = np.sin(dlon) * np.cos(lat2_rad)
-        x = np.cos(lat1_rad) * np.sin(lat2_rad) - np.sin(lat1_rad) * np.cos(lat2_rad) * np.cos(dlon)
-        bearing_from_north = np.degrees(np.arctan2(y, x))
-        
-        # 轉換為從東方逆時針的角度(指向)
-        orientation = 90 - bearing_from_north
-        
-        # 確保角度在 0-360 度範圍內
-        orientation = orientation % 360
-        
-        return orientation
-    
-    def calculate_orientation_angle_cartesian(lat1, lon1, lat2, lon2):
-        """
-        使用笛卡爾座標計算從點1到點2的指向（平面近似）
-        直接使用經緯度差異計算角度
-        
-        Returns:
-        --------
-        float : 指向（度）
-            0° = 正東（East）
-            90° = 正北（North）
-            180° = 正西（West）
-            270° = 正南（South）
-        """
-        # 計算經緯度差異
-        dlat = lat2 - lat1
-        dlon = lon2 - lon1
-        
-        # 使用 arctan2 計算角度（從東方逆時針）
-        # 注意：dlon 對應 x 軸（東西向），dlat 對應 y 軸（南北向）
-        orientation = np.degrees(np.arctan2(dlat, dlon))
-        
-        # 確保角度在 0-360 度範圍內
-        orientation = orientation % 360
-        
-        return orientation
     
     # 根據選擇的方法計算指向
     if orientation_method == 'spherical':
@@ -165,11 +191,7 @@ def custom_cross_section(data, start, end, lons, lats, steps=101, method='neares
     else:
         direction_desc = "SE"
     
-    #print(f"    剖面指向: {orientation_angle:.2f}° ({direction_desc})")
-    
     # 計算每個剖面點的累積距離（沿路徑）
-    # 第一個點距離為 0
-    # 第 i 個點的距離 = sum(第0到1段 + 第1到2段 + ... + 第i-1到i段)
     distances_km = np.zeros(steps)
     for i in range(1, steps):
         segment_distance = haversine_distance(
@@ -178,12 +200,6 @@ def custom_cross_section(data, start, end, lons, lats, steps=101, method='neares
         )
         distances_km[i] = distances_km[i-1] + segment_distance
     
-    # 計算每個剖面點的指向（相對於起點）
-    #point_orientations = np.array([
-    #    calculate_orientation_angle(start[0], start[1], lat, lon)
-    #    for lat, lon in zip(lats_path, lons_path)
-    #])
-
     # 計算每個剖面點的方位角（局部方向，相對於相鄰點）
     point_orientations = np.zeros(steps)
     
@@ -199,7 +215,6 @@ def custom_cross_section(data, start, end, lons, lats, steps=101, method='neares
             lats_path[i-1], lons_path[i-1],
             lats_path[i+1], lons_path[i+1]
         )
-        #print(f"{i}, {lats_path[i-1]}, {lons_path[i-1]}, {lats_path[i+1]}, {lons_path[i+1]}, {point_orientations[i]}")
     
     # 終點：從前一點指向本點
     point_orientations[-1] = calculate_orientation_angle(
@@ -212,7 +227,7 @@ def custom_cross_section(data, start, end, lons, lats, steps=101, method='neares
     lons_grid = lons.values
     
     # 預先計算每個網格點到剖面線的最短距離，用於篩選
-    #print(f"    計算網格點到剖面線的距離（使用 Haversine 公式）...")
+    # print(f"    計算網格點到剖面線的距離（使用 Haversine 公式）...")
     grid_points = np.column_stack([lats_grid.ravel(), lons_grid.ravel()])
     path_points = np.column_stack([lats_path, lons_path])
     
@@ -261,7 +276,7 @@ def custom_cross_section(data, start, end, lons, lats, steps=101, method='neares
     # 準備插值用的點（只保留在緩衝區內的點）
     points_filtered = grid_points[spatial_mask]
     
-    print(f"    開始插值 {n_other} 個切片...")
+    print(f"    開始插值 {n_other} 個切片 (Method: {method})...")
     
     # 對每個切片進行插值
     for idx in range(n_other):
@@ -282,8 +297,18 @@ def custom_cross_section(data, start, end, lons, lats, steps=101, method='neares
             result[idx, :] = np.nan
             continue
         
-        # 插值到剖面路徑
-        result[idx, :] = griddata(points_valid, values_valid, path_points, method=method)
+        # 使用 MetPy interpolate_to_points 進行插值
+        # interp_type 對應我們傳入的 method
+        # **kwargs 會傳入 search_radius, gamma, rbf_func 等參數
+        try:
+            result[idx, :] = interpolate_to_points(
+                points_valid, values_valid, path_points,
+                interp_type=method, 
+                **kwargs
+            )
+        except Exception as e:
+            print(f"        插值錯誤 (Slice {idx}): {e}")
+            result[idx, :] = np.nan
     
     # 將結果重塑回原始維度結構（除了空間維度改為 cross_section_index）
     if len(other_dims) > 0:
@@ -326,7 +351,8 @@ def custom_cross_section(data, start, end, lons, lats, steps=101, method='neares
             'cross_section_orientation_method': orientation_method,
             'cross_section_direction': direction_desc,
             'cross_section_start': f"({start[0]:.2f}, {start[1]:.2f})",
-            'cross_section_end': f"({end[0]:.2f}, {end[1]:.2f})"
+            'cross_section_end': f"({end[0]:.2f}, {end[1]:.2f})",
+            'interpolation_method': method
         }
     )
 
@@ -340,10 +366,7 @@ def custom_cross_section(data, start, end, lons, lats, steps=101, method='neares
     print(f"        剖面總長度: {distances_km[-1]:.2f} km")
     print(f"        剖面指向: {orientation_angle:.2f}° ({direction_desc})")
     
-    #import matplotlib.pyplot as plt
-    #breakpoint()
     return cross_data
-
 
 #====================================================================================================
 def main():
