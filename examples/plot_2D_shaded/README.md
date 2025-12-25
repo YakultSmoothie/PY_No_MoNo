@@ -31,7 +31,7 @@ Fast 2D array visualization with automatic statistics and multi-format input sup
 - 展示如何利用 plot_2D_shaded 繪製 Hovmöller 圖表，並疊加自動偵測的物理量極值軌跡（如最大渦度線）。
 - **Code**: [GitHub](https://github.com/YakultSmoothie/PY_No_MoNo/blob/main/examples/plot_2D_shaded/p2d_Example_3.py)
 - **Output**: [GitHub](https://github.com/YakultSmoothie/PY_No_MoNo/blob/main/examples/plot_2D_shaded/p2d_Example_3.png)
-- **內插至指定剖面**: [GitHub](https://github.com/YakultSmoothie/PY_No_MoNo/blob/main/definitions/def_custom_cross_section.py) def_custom_cross_section.py
+- [`def_custom_cross_section.py`](https://github.com/YakultSmoothie/PY_No_MoNo/blob/main/definitions/def_custom_cross_section.py) - 內插至指定剖面
 
 ### Example 4: (Coming Soon)
 
@@ -52,7 +52,9 @@ Fast 2D array visualization with automatic statistics and multi-format input sup
 ## 📖 Related Functions
 
 - [`add_user_info_text()`](https://github.com/YakultSmoothie/PY\_No\_MoNo/blob/main/definitions/add\_user\_info\_text.py) - Add annotations to plots
+- [`draw_ol()`](https://github.com/YakultSmoothie/PY_No_MoNo/blob/main/definitions/draw_ol.py) - Add a thick outline box to plots
 - [`figs_to_mp4()`](https://github.com/YakultSmoothie/PY\_No\_MoNo/blob/main/definitions/def\_figs\_to\_mp4.py) - Create animations from figures
+
 
 
 
