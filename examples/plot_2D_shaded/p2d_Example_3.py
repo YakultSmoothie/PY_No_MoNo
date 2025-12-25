@@ -43,8 +43,107 @@ from plot_moisture_wind_field import get_cluster_members, load_wrfinput_info
 print(f"\n ====== RUNNING {__file__} ======")
 
 #======================================================================================================================
+# 常數與分群設定 (Cluster Configurations)
+#======================================================================================================================
+CLUSTER_MEMBERS = {
+    'C1': [1, 2, 5, 6, 7, 10, 12, 15, 19, 24, 25, 30, 34, 36, 41, 46, 47, 50, 52, 57, 59, 60, 61, 62, 63],
+    'C2': [3, 13, 14, 16, 21, 22, 40, 44, 48, 51, 54, 56],
+    'C3': [4, 8, 11, 17, 20, 28, 35, 43, 45, 58],
+    'C4': [9, 18, 23, 26, 27, 29, 31, 32, 33, 37, 38, 39, 42, 49, 53, 55, 64],
+    'WES': list(range(1, 65)),  # 全系集（Whole Ensemble System）
+    'one': [1],   # for test one member
+    'test': [1,2,3]   # for test members
+}
+
+def get_cluster_members(cluster_id):
+    """
+    根據分群代號選取系集成員（Ensemble members）。
+    """
+    print(f"run get_cluster_members, arg: {cluster_id}")
+    if cluster_id not in CLUSTER_MEMBERS:
+        raise ValueError(f"Unknown cluster_id: {cluster_id}. Available: {list(CLUSTER_MEMBERS.keys())}")
+    return CLUSTER_MEMBERS[cluster_id]
+
+
+#======================================================================================================================
 # CORE FUNCTIONS (核心函式庫)
 #======================================================================================================================
+
+def load_wrfinput_info(domain='d01'):
+    """ v1.0 2025/12/18 16:13
+    讀取 WRF 輸入檔案的地形與投影資訊
+
+    Parameters:
+    -----------
+    domain : str
+        模式網格domain,可為 'd01', 'd02', 或 'd03'
+
+    Returns:
+    --------
+    dict : 包含 hgt, landmask, proj, dx, dy, lons, lats 的字典
+    """
+    print(f"run load_wrfinput_info ...")
+
+    # 定義不同 domain 的路徑
+    base_path = "/jet/ox/work/MYHPE/1/2024-0415-Hby_ETKF/ETKF/RUN-forecast/WRF-RUN"
+
+    if domain == 'd01':
+        wrfinput_path = f"{base_path}/CTL/wrfin/m001_wrfinput_d01"
+    elif domain == 'd02':
+        wrfinput_path = f"{base_path}/CTL/wrfin/wrfinput_d02"
+    elif domain == 'd03':
+        wrfinput_path = f"{base_path}/CTL/wrfin/wrfinput_d03"
+    else:
+        raise ValueError(f"Invalid domain: {domain}. Must be 'd01', 'd02', or 'd03'")
+
+    print(f"    wrfinput_path: {wrfinput_path}")
+
+    # 陣列變數 - load
+    ncfile = nc.Dataset(wrfinput_path)
+    cosalpha = wrf.getvar(ncfile, 'COSALPHA')  # 地圖旋轉局部餘弦
+    sinalpha = wrf.getvar(ncfile, 'SINALPHA')  # 地圖旋轉局部正弦
+    hgt = wrf.getvar(ncfile, 'HGT')
+    landmask = wrf.getvar(ncfile, 'LANDMASK')
+    lons = hgt['XLONG'].squeeze()
+    lats = hgt['XLAT'].squeeze()
+
+    # 陣列變數 - 重新命名座標
+
+    cosalpha = cosalpha.rename(COORD_RENAME_DICT_2D)
+    sinalpha = sinalpha.rename(COORD_RENAME_DICT_2D)
+    hgt = hgt.rename(COORD_RENAME_DICT_2D)
+    landmask = landmask.rename(COORD_RENAME_DICT_2D)
+    lons = lons.rename(COORD_RENAME_DICT_2D)
+    lats = lats.rename(COORD_RENAME_DICT_2D)
+
+    # non-陣列變數 - load
+    dy = ncfile.DY
+    dx = ncfile.DX
+    proj = wrf.get_cartopy(hgt)
+
+    # 手動 get 投影
+    # proj = ccrs.LambertConformal(
+    #     central_longitude=ds_land.attrs['projection_standard_longitude'],
+    #     central_latitude=ds_land.attrs['projection_center_latitude'],
+    #     standard_parallels=(
+    #         ds_land.attrs['projection_true_latitude_1'],
+    #         ds_land.attrs['projection_true_latitude_2']
+    #         )
+    # )
+
+    return {
+        'cosalpha': cosalpha,
+        'sinalpha': sinalpha,
+        'hgt': hgt,
+        'landmask': landmask,
+        'proj': proj,
+        'dx': dx,
+        'dy': dy,
+        'lons': lons,
+        'lats': lats,
+        'ncfile': ncfile,
+        'wrfinput_path': wrfinput_path
+    }
 
 def load_wrf_grid(domain: str) -> Dict[str, Any]:
     """
