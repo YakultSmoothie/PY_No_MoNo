@@ -38,7 +38,6 @@ import definitions as mydef
 from definitions.plot_2D_shaded import plot_2D_shaded as p2d
 from definitions.def_quantity_to_xarray import quantity_to_xarray as q2x
 from definitions.def_custom_cross_section import custom_cross_section, haversine_distance
-from plot_moisture_wind_field import get_cluster_members, load_wrfinput_info
 
 print(f"\n ====== RUNNING {__file__} ======")
 
