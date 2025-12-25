@@ -25,6 +25,7 @@ cnt = shd.copy()
 vxx = -Y  # x 方向分量
 vyy = X   # y 方向分量
 
+# *** MAIN RUN ***
 p2d(shd,            # color shading
     cnt=cnt,        # 等值線
     vx=vxx,         # x 方向向量
