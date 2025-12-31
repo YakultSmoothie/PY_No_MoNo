@@ -3,8 +3,8 @@ def calculate_significance_mask_vectorized(data_A, data_B, test_axis=0, alpha=0.
     向量化版本的統計顯著性檢驗
     
     Parameters:
-    data_A: 群組 A 的資料 (任意維度)
-    data_B: 群組 B 的資料 (任意維度)
+    data_A: 群組 A 的資料 (任意維度) numpy 陣列
+    data_B: 群組 B 的資料 (任意維度) numpy 陣列
     test_axis: 進行統計檢驗的維度軸 (default: 0)
     alpha: 顯著性水準 (default: 0.05)
     test_type: 統計檢驗類型 ('ttest', 'welch')

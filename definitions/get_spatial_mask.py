@@ -13,11 +13,14 @@ def get_spatial_mask(
     lons: Union[NDArray[np.floating], xr.DataArray],
     lats: Union[NDArray[np.floating], xr.DataArray],
     extent: Tuple[float, float, float, float],
-) -> Tuple[NDArray[np.bool_], slice, slice, NDArray[np.intp], NDArray[np.intp]]:
+) -> Tuple[NDArray[np.bool_], 
+           slice, slice, 
+           NDArray[np.intp], NDArray[np.intp], 
+           Union[NDArray[np.floating], xr.DataArray], Union[NDArray[np.floating], xr.DataArray]]:
     """
     根據經緯度範圍獲取空間遮罩和索引切片
     
-    Parameters
+Parameters
     ----------
     lons : NDArray[np.floating] or xr.DataArray
         經度陣列，可為1維或2維。如為1維會自動擴充為2維
@@ -35,19 +38,19 @@ def get_spatial_mask(
     -------
     mask : NDArray[np.bool_]
         2維布林遮罩陣列，形狀為 (n_lat, n_lon)
-        True 表示該點在目標區域內
+        True 表示該點在目標區域內（含向外延伸一格）
     x_slice : slice
         經度方向的切片索引（對應最後一維）
-        格式: slice(start, stop, step)
     y_slice : slice
         緯度方向的切片索引（對應倒數第二維）
-        格式: slice(start, stop, step)
     x_indices : NDArray[np.intp]
         經度方向符合條件的所有索引值
-        dtype: int64 或 int32（取決於平台）
     y_indices : NDArray[np.intp]
         緯度方向符合條件的所有索引值
-        dtype: int64 或 int32（取決於平台）
+    new_lons : NDArray[np.floating] or xr.DataArray
+        根據切片範圍提取後的 2 維經度座標陣列
+    new_lats : NDArray[np.floating] or xr.DataArray
+        根據切片範圍提取後的 2 維緯度座標陣列
     
     Raises
     ------
@@ -60,11 +63,13 @@ def get_spatial_mask(
     -----
     - 1維輸入會自動透過 meshgrid 擴充為2維
     - 支援帶有 pint/MetPy 單位的陣列（會自動提取數值部分）
-    - 回傳的 slice 可直接用於陣列索引: data[y_slice, x_slice]
-    - 回傳的 indices 可用於精確索引: data[np.ix_(y_indices, x_indices)]
+    - 回傳的 slice 可直接用於原始資料陣列索引: data[y_slice, x_slice]
+    - 回傳的 new_lons/new_lats 形狀與切片後的資料一致
     
     Version History
     ---------------
+    v1.1 2025-12-30 YakultSmoothie and Gemini
+        新增回傳 new_lons 與 new_lats 陣列，方便直接取得切片後的座標系統
     v1.0.1 2025-11-20 YakultSmoothie
         修改邊界條件為嚴格不等式(> 和 <),並向外延伸一格,含邊界保護
     v1.0 2025-11-13 YakultSmoothie
@@ -75,14 +80,11 @@ def get_spatial_mask(
     
     # ========== 步驟1: 檢查輸入維度 ==========
     if lons.ndim > 2:
-        raise ValueError(f"經度陣列維度過高: {lons.ndim}維,僅支援1維或2維")
+        raise ValueError(f"    經度陣列維度過高: {lons.ndim}維, 僅支援1維或2維")
     if lats.ndim > 2:
-        raise ValueError(f"緯度陣列維度過高: {lats.ndim}維,僅支援1維或2維")
+        raise ValueError(f"    緯度陣列維度過高: {lats.ndim}維, 僅支援1維或2維")
     
-    print(f"    輸入維度: lons={lons.ndim}D, lats={lats.ndim}D")
-    
-    # ========== 步驟2: 處理單位(如果有) ==========
-    # 檢查是否為 xarray DataArray
+    # ========== 步驟2: 處理單位與格式 (xarray/pint) ==========
     if hasattr(lons, 'values'):
         lons_data = lons.values
     else:
@@ -93,127 +95,64 @@ def get_spatial_mask(
     else:
         lats_data = lats
     
-    # 檢查是否有 pint 單位
     if hasattr(lons_data, 'magnitude'):
         lons_data = lons_data.magnitude
-        print(f"    偵測到經度單位,已提取數值部分")
-    
     if hasattr(lats_data, 'magnitude'):
         lats_data = lats_data.magnitude
-        print(f"    偵測到緯度單位,已提取數值部分")
     
-    # 確保是 numpy 陣列
     lons_data = np.asarray(lons_data)
     lats_data = np.asarray(lats_data)
     
     # ========== 步驟3: 自動擴充1維陣列為2維 ==========
     if lons_data.ndim == 1 and lats_data.ndim == 1:
-        print(f"    1維輸入偵測: 使用 meshgrid 擴充為2維")
         lons_data, lats_data = np.meshgrid(lons_data, lats_data)
     elif lons_data.ndim == 1:
-        print(f"    經度為1維: 使用 broadcast 擴充")
         lons_data = np.broadcast_to(lons_data[np.newaxis, :], lats_data.shape)
     elif lats_data.ndim == 1:
-        print(f"    緯度為1維: 使用 broadcast 擴充")
         lats_data = np.broadcast_to(lats_data[:, np.newaxis], lons_data.shape)
     
-    # ========== 步驟4: 確保形狀一致 ==========
-    if lons_data.shape != lats_data.shape:
-        raise ValueError(
-            f"經緯度陣列形狀不一致: lons {lons_data.shape} vs lats {lats_data.shape}"
-        )
-    
-    print(f"    網格形狀: {lats_data.shape}")
-    
-    # ========== 步驟5: 解包目標範圍 ==========
-    lon_min = float(extent[0])
-    lon_max = float(extent[1])
-    lat_min = float(extent[2])
-    lat_max = float(extent[3])
-    
-    print(f"    目標區域: 經度 [{lon_min:.2f}, {lon_max:.2f}], "
-          f"緯度 [{lat_min:.2f}, {lat_max:.2f}]")
-    
-    # ========== 步驟6: 建立遮罩 ==========
+    # ========== 步驟4-6: 建立遮罩與範圍控制 ==========
+    lon_min, lon_max, lat_min, lat_max = extent
     mask = (
-        (lons_data > lon_min) & 
-        (lons_data < lon_max) & 
-        (lats_data > lat_min) & 
-        (lats_data < lat_max)
+        (lons_data > lon_min) & (lons_data < lon_max) & 
+        (lats_data > lat_min) & (lats_data < lat_max)
     )
 
-    n_total = mask.size
-    n_selected = mask.sum()
-    percentage = 100.0 * n_selected / n_total if n_total > 0 else 0.0
+    # ========== 步驟7-8: 建立切片與向外延伸 ==========
+    x_indices_raw = np.where(mask.any(axis=0))[0]
+    y_indices_raw = np.where(mask.any(axis=1))[0]
 
-    # print(f"    遮罩統計(延伸前): {n_selected}/{n_total} 個點 ({percentage:.1f}%)")
-
-    # ========== 步驟7: 獲取索引範圍並向外延伸一格 ==========
-    # 找出每一列(緯度)是否有任何符合的點
-    # 找出每一行(經度)是否有任何符合的點
-    x_indices = np.where(mask.any(axis=0))[0]  # 經度方向(列)
-    y_indices = np.where(mask.any(axis=1))[0]  # 緯度方向(行)
-
-    # ========== 步驟8: 建立切片(向外延伸一格) ==========
-    if len(x_indices) > 0 and len(y_indices) > 0:
-        # 取得原始範圍
-        x_start = int(x_indices[0])
-        x_end = int(x_indices[-1])
-        y_start = int(y_indices[0])
-        y_end = int(y_indices[-1])
+    if len(x_indices_raw) > 0 and len(y_indices_raw) > 0:
+        x_start_extended = max(0, int(x_indices_raw[0]) - 1)
+        x_end_extended = min(lons_data.shape[1] - 1, int(x_indices_raw[-1]) + 1)
+        y_start_extended = max(0, int(y_indices_raw[0]) - 1)
+        y_end_extended = min(lats_data.shape[0] - 1, int(y_indices_raw[-1]) + 1)
         
-        # 向外延伸一格(注意邊界)
-        x_start_extended = max(0, x_start - 1)
-        x_end_extended = min(lons_data.shape[1] - 1, x_end + 1)
-        y_start_extended = max(0, y_start - 1)
-        y_end_extended = min(lats_data.shape[0] - 1, y_end + 1)
-        
-        # 建立延伸後的切片
         x_slice = slice(x_start_extended, x_end_extended + 1)
         y_slice = slice(y_start_extended, y_end_extended + 1)
         
-        # 更新 indices 為延伸後的範圍
         x_indices = np.arange(x_start_extended, x_end_extended + 1)
         y_indices = np.arange(y_start_extended, y_end_extended + 1)
         
-        # 更新遮罩為延伸後的範圍
-        mask_extended = np.zeros_like(mask, dtype=bool)
-        mask_extended[y_start_extended:y_end_extended+1, 
-                    x_start_extended:x_end_extended+1] = True
-        
-        n_selected_extended = mask_extended.sum()
-        percentage_extended = 100.0 * n_selected_extended / n_total
+        # 更新遮罩
+        mask = np.zeros_like(mask, dtype=bool)
+        mask[y_slice, x_slice] = True
 
-        # 計算延伸後區域的實際經緯度範圍
-        lon_min_actual = lons_data[y_start_extended:y_end_extended+1, 
-                                    x_start_extended:x_end_extended+1].min()
-        lon_max_actual = lons_data[y_start_extended:y_end_extended+1, 
-                                    x_start_extended:x_end_extended+1].max()
-        lat_min_actual = lats_data[y_start_extended:y_end_extended+1, 
-                                    x_start_extended:x_end_extended+1].min()
-        lat_max_actual = lats_data[y_start_extended:y_end_extended+1, 
-                                    x_start_extended:x_end_extended+1].max()
+        # 新增：獲取切割後的經緯度陣列
+        new_lons = lons[y_slice, x_slice]
+        new_lats = lats[y_slice, x_slice]
         
-        print(f"    遮罩統計: {n_selected_extended}/{n_total} 個點 ({percentage_extended:.1f}%)")
-        print(f"    索引範圍(延伸後):")
-        print(f"        X (經度): [{lon_min_actual:g}, {lon_max_actual:g}] 共 {len(x_indices)} 個索引")
-        print(f"        Y (緯度): [{lat_min_actual:g}, {lat_max_actual:g}] 共 {len(y_indices)} 個索引")
-        print(f"    切片物件:")
-        print(f"        x_slice = slice({x_start_extended}, {x_end_extended+1})")
-        print(f"        y_slice = slice({y_start_extended}, {y_end_extended+1})")
-        
-        # 將延伸後的遮罩取代原本的遮罩
-        mask = mask_extended
-    
     else:
-        # 如果沒有符合的點,返回空切片
         x_slice = slice(0, 0)
         y_slice = slice(0, 0)
+        x_indices = np.array([], dtype=np.intp)
+        y_indices = np.array([], dtype=np.intp)
+        new_lons = np.array([])
+        new_lats = np.array([])
         print(f"    警告: 目標區域沒有符合的網格點!")
     
     print(f"執行完成!\n")
-    
-    return mask, x_slice, y_slice, x_indices, y_indices
+    return mask, x_slice, y_slice, x_indices, y_indices, new_lons, new_lats
 
 
 #====================================================================================================
@@ -236,7 +175,7 @@ def main():
     extent_test1 = (119.5, 121.5, 23.5, 24.5)    
     print(f"extent_test1 = {extent_test1}")
     
-    mask1, x_slice1, y_slice1, x_idx1, y_idx1 = get_spatial_mask(
+    mask1, x_slice1, y_slice1, x_idx1, y_idx1, *_ = get_spatial_mask(
         lons_1d, lats_1d, extent_test1
     )
     
@@ -253,7 +192,7 @@ def main():
     
     lons_2d, lats_2d = np.meshgrid(lons_1d, lats_1d)
     
-    mask2, x_slice2, y_slice2, x_idx2, y_idx2 = get_spatial_mask(
+    mask2, x_slice2, y_slice2, x_idx2, y_idx2, *_ = get_spatial_mask(
         lons_2d, lats_2d, extent_test1
     )
     
@@ -289,7 +228,7 @@ def main():
     print("區域完全在網格外")
     extent_outside = (125, 130, 30, 35)
     print(f"extent_outside = {extent_outside}")
-    mask_out, x_slice_out, y_slice_out, _, _ = get_spatial_mask(
+    mask_out, x_slice_out, y_slice_out, *_ = get_spatial_mask(
         lons_1d, lats_1d, extent_outside
     )
     print(f"區域在網格外: 遮罩總數 = {mask_out.sum()}")
@@ -298,7 +237,7 @@ def main():
     print("區域覆蓋超出整個網格")
     extent_full = (117, 124, 21, 27)
     print(f"extent_full = {extent_full}")
-    mask_full, x_slice_full, y_slice_full, _, _ = get_spatial_mask(
+    mask_full, x_slice_full, y_slice_full, *_ = get_spatial_mask(
         lons_1d, lats_1d, extent_full
     )
     print(f"區域覆蓋全網格: 遮罩總數 = {mask_full.sum()}/{mask_full.size}")

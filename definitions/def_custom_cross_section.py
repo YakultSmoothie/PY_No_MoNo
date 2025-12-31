@@ -138,6 +138,7 @@ def custom_cross_section(data, start, end, lons, lats, steps=101, method='linear
         如果原始資料有單位,會自動保留
         屬性中包含 'cross_section_orientation_deg' (剖面指向，度)
 
+    v1.3 2025-12-20 YakultSmoothie 微調 print 內容
     v1.2 2025-12-24 YakultSmoothie with Gemini3
         整合 metpy.interpolate.interpolate_to_points 以支援 barnes/cressman 等進階插值
     v1.1 2025-10-17 YakultSmoothie with Claude
@@ -223,8 +224,9 @@ def custom_cross_section(data, start, end, lons, lats, steps=101, method='linear
     ) 
 
     # 獲取原始網格的經緯度（假設最後兩維是空間維度）
-    lats_grid = lats.values
-    lons_grid = lons.values
+    # 使用 np.asarray 確保同時支援 xarray 與 numpy 陣列
+    lats_grid = np.asarray(lats)
+    lons_grid = np.asarray(lons)
     
     # 預先計算每個網格點到剖面線的最短距離，用於篩選
     # print(f"    計算網格點到剖面線的距離（使用 Haversine 公式）...")
@@ -280,8 +282,8 @@ def custom_cross_section(data, start, end, lons, lats, steps=101, method='linear
     
     # 對每個切片進行插值
     for idx in range(n_other):
-        if n_other > 1 and idx % 100 == 0:
-            print(f"        處理切片 {idx+1}/{n_other}")
+        # if n_other > 1 and idx % 100 == 0:
+        #     print(f"        處理切片 {idx+1}/{n_other}")
         
         # 取得該切片的資料
         values = data_reshaped[idx, :]
@@ -293,7 +295,7 @@ def custom_cross_section(data, start, end, lons, lats, steps=101, method='linear
         values_valid = values_filtered[mask_valid]
         
         if len(values_valid) == 0:
-            print(f"        警告: 切片 {idx} 沒有有效資料")
+            # print(f"        警告: 切片 {idx} 沒有有效資料")
             result[idx, :] = np.nan
             continue
         

@@ -1,3 +1,59 @@
+import numpy as np
+import xarray as xr 
+import pandas as pd       
+from matplotlib import colormaps
+from matplotlib.ticker import MaxNLocator
+import matplotlib as matplotlib
+matplotlib.use('TkAgg') # 或 'Qt5Agg'
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+import matplotlib.ticker as mticker     
+import matplotlib.colors as mcolors
+import cartopy.crs as ccrs
+import cartopy.feature as cfeature
+import cartopy.mpl.ticker as cticker   
+from datetime import datetime
+import matplotlib.patheffects as patheffects
+import warnings
+from typing import Union, Optional
+from pathlib import Path
+
+#--------------------------------------------
+# save figure
+#--------------------------------------------
+def f2p(
+    figure: Optional[plt.Figure] = None, 
+    out: str = "./f2p_output.png", 
+    do_tight_layout: bool = True, 
+    dpi: int = 180, 
+    bbox_inches: str = 'tight'
+):
+    """
+    plt.figure to .png
+    保存圖像，並可選擇是否執行 tight_layout。
+    """
+
+    # 如果呼叫時沒傳入 pltfigure，則自動抓取當前活動中的 fig
+    target_fig = figure if figure is not None else plt.gcf()
+
+    print("[f2p] Saving file(s) ...")
+
+    if not out:
+        print("警告：未指定 output_path，取消存檔。")
+        return
+
+    # 根據參數決定是否執行 tight_layout
+    if do_tight_layout:
+        target_fig.tight_layout()
+        # print("    已套用 tight_layout 佈局優化。")
+
+    # 建立資料夾
+    Path(out).parent.mkdir(parents=True, exist_ok=True)
+
+    # 存檔
+    target_fig.savefig(out, dpi=dpi, bbox_inches=bbox_inches)
+    print(f"    figure saved: {out}")
+
 #--------------------------------------------
 # UV_grid to UV_lonlat
 #--------------------------------------------
@@ -11,7 +67,7 @@ def rotate_vector(ua, va, cosalpha, sinalpha, component="u"):
         V_rot = ua * sinalpha + va * cosalpha
     
     參數:
-        ua (array-like): 原始向量的 U 分量。可以是 2D (lat, lon) 或 3D (time, lat, lon)。
+        ua (array-like): 原始向量的 U 分量。可以是 2D (lat, lon) 或 3D (time, lat, lon) 或更多 (..., lat, lon)。
         va (array-like): 原始向量的 V 分量。
         cosalpha (array-like): 旋轉角度的餘弦值。通常為 2D (lat, lon)。
         sinalpha (array-like): 旋轉角度的正弦值。通常為 2D (lat, lon)。
@@ -335,6 +391,7 @@ def _add_vector_quiverkey(ax, qu, qk_x, qk_y, vref, vector_unit_str,
             print(f"{ind2}     圖例y: {y_label}")
     
     return quiverkey_list
+
 #--------------------------------------------
 # 加粗座標軸的邊框
 #--------------------------------------------
@@ -410,7 +467,7 @@ def plot_2D_shaded(array, x=None, y=None,
                    
                    # coastline
                    coastline_color=('black', 'yellow'),  # When coastline_color=None, do not draw coastline
-                   coastline_width=(1.0, 0), 
+                   coastline_width=(2.0, 0), 
                    coastline_resolution='50m',
 
                    # grid line
@@ -536,9 +593,9 @@ def plot_2D_shaded(array, x=None, y=None,
         coastline (tuple or None): 海岸線顏色(外層, 內層)，預設('black', 'yellow')
             - tuple: (外層顏色, 內層顏色)，繪製雙層海岸線增強可見度
             - None: 不繪製海岸線
-        coastline_width (tuple): 海岸線寬度(外層, 內層)，預設(1.0, 0)
+        coastline_width (tuple): 海岸線寬度(外層, 內層)，預設(2.0, 0)
             - (外層線寬, 內層線寬)，外層應略粗於內層
-            例如：(2.0, 1.5), (1.5, 1.0)        
+            例如：(2.0, 0.3), (1.5, 1.0)        
         coastline_resolution (str): 海岸線解析度，預設'50m'
             - '10m': 高解析度，適合區域地圖
             - '50m': 中解析度，適合一般用途
@@ -602,7 +659,7 @@ def plot_2D_shaded(array, x=None, y=None,
 
     === 輸出控制參數 ===
         o (str): 輸出檔案路徑，如果為None則不保存
-        dpi (int): 圖像解析度，預設150
+        dpi (int): 圖像解析度，預設180
         silent (bool): 是否抑制統計資訊的終端輸出，預設False
         
     === 圖形物件參數 ===
@@ -747,6 +804,8 @@ def plot_2D_shaded(array, x=None, y=None,
             - 常用組合：黑色文字配白色描邊，或白色文字配黑色描邊
             例如：user_info_color='white', user_info_stroke_color='black'   
 
+    v1.20.3 2025-12-31 微調存檔方式 
+    v1.20.2 2025-12-30 指定打開互動端 matplotlib.use('TkAgg') 
     v1.19.2 2025-12-16 修正 user_info 的讀取方式錯誤
     v1.19.1 2025-11-13 調整 function 導入方式
     v1.19 2025-11-09 網格間隔自動設定邏輯優化
@@ -829,23 +888,6 @@ def plot_2D_shaded(array, x=None, y=None,
         numpy.ndarray: YY - 網格緯度座標
     '''
 
-
-    import numpy as np
-    import xarray as xr 
-    import pandas as pd       
-    from matplotlib import colormaps
-    from matplotlib.ticker import MaxNLocator
-    import matplotlib as matplotlib
-    import matplotlib.pyplot as plt
-    import matplotlib.dates as mdates
-    import matplotlib.ticker as mticker     
-    import matplotlib.colors as mcolors
-    import cartopy.crs as ccrs
-    import cartopy.feature as cfeature
-    import cartopy.mpl.ticker as cticker   
-    from datetime import datetime
-    import matplotlib.patheffects as patheffects
-    import warnings
     
     # 建立縮排字串
     ind = ' ' * indent
@@ -1067,7 +1109,7 @@ def plot_2D_shaded(array, x=None, y=None,
     stats['contourf'] = cf
 
     from definitions.draw_ol import draw_ol as draw_ol
-    draw_ol(ax)
+    draw_ol(ax, linewidth=2.0)
     
     # 添加標題和軸標籤    
     if title:
@@ -1977,10 +2019,7 @@ def plot_2D_shaded(array, x=None, y=None,
 
     # 保存圖像    
     if o:        
-        fig.tight_layout()
-        fig.savefig(o, dpi=dpi, bbox_inches=bbox_inches)
-        if not silent:
-            print(f"{ind2}圖像已保存至: {o}")
+        f2p(fig, out=o, do_tight_layout=True, dpi=dpi, bbox_inches='tight')
     
     if not silent:
         print(f"{ind2}title: {title}")
