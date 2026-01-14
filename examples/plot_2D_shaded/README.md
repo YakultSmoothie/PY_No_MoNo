@@ -35,7 +35,7 @@ Fast 2D array visualization with automatic statistics and multi-format input sup
 
 ### Example 4: 加上斜線網格填充(Hatch Pattern)
 - 利用 contourf 繪製 hatches
-- - **Link**: [UpNote](https://getupnote.com/share/notes/xf7xZVKNuQNiC02vUdCCJmXIxIL2/019b77d1-ad55-7785-bfd4-fa4f2559de86)
+- **Link**: [UpNote](https://getupnote.com/share/notes/xf7xZVKNuQNiC02vUdCCJmXIxIL2/019b77d1-ad55-7785-bfd4-fa4f2559de86)
 
 ### Example 5: (Coming Soon)
 
@@ -58,6 +58,7 @@ Fast 2D array visualization with automatic statistics and multi-format input sup
 - [`add_user_info_text()`](https://github.com/YakultSmoothie/PY\_No\_MoNo/blob/main/definitions/add\_user\_info\_text.py) - Add annotations to plots
 - [`draw_ol()`](https://github.com/YakultSmoothie/PY_No_MoNo/blob/main/definitions/draw_ol.py) - Add a thick outline box to plots
 - [`figs_to_mp4()`](https://github.com/YakultSmoothie/PY\_No\_MoNo/blob/main/definitions/def\_figs\_to\_mp4.py) - Create animations from figures
+
 
 
 
