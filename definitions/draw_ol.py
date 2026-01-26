@@ -1,7 +1,7 @@
 #--------------------------------------------
 # 加粗座標軸的邊框
 #--------------------------------------------
-def draw_ol(ax, linewidth=2.7, color='black', zorder=99):
+def draw_ol(ax, linewidth=2.0, color='black', zorder=99):
     """加粗座標軸的邊框"""
     for spine in ax.spines.values():
         spine.set_linewidth(linewidth)

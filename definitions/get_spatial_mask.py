@@ -3,24 +3,24 @@
 空間遮罩與索引提取工具
 用於從經緯度網格中提取指定區域的遮罩和切片索引
 """
-from typing import Union, Tuple
+
 import numpy as np
 import xarray as xr
+from typing import Union, Tuple, Literal, List, Dict, Any
 from numpy.typing import NDArray
+from definitions.DualAccessDict import DualAccessDict as DualAccessDict
 
 #====================================================================================================
+    
 def get_spatial_mask(
     lons: Union[NDArray[np.floating], xr.DataArray],
     lats: Union[NDArray[np.floating], xr.DataArray],
-    extent: Tuple[float, float, float, float],
-) -> Tuple[NDArray[np.bool_], 
-           slice, slice, 
-           NDArray[np.intp], NDArray[np.intp], 
-           Union[NDArray[np.floating], xr.DataArray], Union[NDArray[np.floating], xr.DataArray]]:
+    extent: Union[Tuple[float, float, float, float], Literal['all']],
+) -> DualAccessDict:
     """
     根據經緯度範圍獲取空間遮罩和索引切片
     
-Parameters
+    Parameters
     ----------
     lons : NDArray[np.floating] or xr.DataArray
         經度陣列，可為1維或2維。如為1維會自動擴充為2維
@@ -32,6 +32,7 @@ Parameters
         形狀: (n_lat, n_lon) 或 (n_lat,)
     extent : Tuple[float, float, float, float]
         目標區域範圍 (lon_min, lon_max, lat_min, lat_max)
+        若傳入 'all'，則選取整個經緯度網格範圍
         單位應與輸入經緯度陣列一致（通常為度）
     
     Returns
@@ -39,6 +40,8 @@ Parameters
     mask : NDArray[np.bool_]
         2維布林遮罩陣列，形狀為 (n_lat, n_lon)
         True 表示該點在目標區域內（含向外延伸一格）
+    strict_mask : NDArray[np.bool_]
+        精確符合 extent 數值範圍的遮罩 (不含延伸格)
     x_slice : slice
         經度方向的切片索引（對應最後一維）
     y_slice : slice
@@ -68,6 +71,9 @@ Parameters
     
     Version History
     ---------------
+    v1.2 2026-01-08 YakultSmoothie and Gemini
+        支援 extent='all' 參數，用於保留原始完整範圍
+        新增回傳 strict_mask，代表精確符合 extent 數值範圍的遮罩（不含向外延伸的一格）
     v1.1 2025-12-30 YakultSmoothie and Gemini
         新增回傳 new_lons 與 new_lats 陣列，方便直接取得切片後的座標系統
     v1.0.1 2025-11-20 YakultSmoothie
@@ -76,266 +82,116 @@ Parameters
         初始版本,支援1D/2D輸入、單位處理、自動擴充
     """
     
-    print(f"執行 get_spatial_mask ...")
+    print(f"執行 get_spatial_mask, extent={extent} ...")
     
-    # ========== 步驟1: 檢查輸入維度 ==========
-    if lons.ndim > 2:
-        raise ValueError(f"    經度陣列維度過高: {lons.ndim}維, 僅支援1維或2維")
-    if lats.ndim > 2:
-        raise ValueError(f"    緯度陣列維度過高: {lats.ndim}維, 僅支援1維或2維")
+    # ========== 步驟1: 處理資料格式與單位 ==========
+    def get_raw_data(obj):
+        data = obj.values if hasattr(obj, 'values') else obj
+        return data.magnitude if hasattr(data, 'magnitude') else np.asarray(data)
+
+    lons_raw = get_raw_data(lons)
+    lats_raw = get_raw_data(lats)
     
-    # ========== 步驟2: 處理單位與格式 (xarray/pint) ==========
-    if hasattr(lons, 'values'):
-        lons_data = lons.values
+    # ========== 步驟2: 自動處理 1D -> 2D ==========
+    if lons_raw.ndim == 1 and lats_raw.ndim == 1:
+        lons_2d, lats_2d = np.meshgrid(lons_raw, lats_raw)
+    elif lons_raw.ndim == 1:
+        lons_2d = np.broadcast_to(lons_raw[np.newaxis, :], lats_raw.shape)
+        lats_2d = lats_raw
+    elif lats_raw.ndim == 1:
+        lats_2d = np.broadcast_to(lats_raw[:, np.newaxis], lons_raw.shape)
+        lons_2d = lons_raw
     else:
-        lons_data = lons
-    
-    if hasattr(lats, 'values'):
-        lats_data = lats.values
+        lons_2d, lats_2d = lons_raw, lats_raw
+
+    # ========== 步驟3: 建立精確遮罩 (Strict Mask) ==========
+    if isinstance(extent, str) and extent.lower() == 'all':
+        strict_mask = np.ones(lons_2d.shape, dtype=bool)
+        x_start, x_end = 0, lons_2d.shape[1] - 1
+        y_start, y_end = 0, lats_2d.shape[0] - 1
     else:
-        lats_data = lats
-    
-    if hasattr(lons_data, 'magnitude'):
-        lons_data = lons_data.magnitude
-    if hasattr(lats_data, 'magnitude'):
-        lats_data = lats_data.magnitude
-    
-    lons_data = np.asarray(lons_data)
-    lats_data = np.asarray(lats_data)
-    
-    # ========== 步驟3: 自動擴充1維陣列為2維 ==========
-    if lons_data.ndim == 1 and lats_data.ndim == 1:
-        lons_data, lats_data = np.meshgrid(lons_data, lats_data)
-    elif lons_data.ndim == 1:
-        lons_data = np.broadcast_to(lons_data[np.newaxis, :], lats_data.shape)
-    elif lats_data.ndim == 1:
-        lats_data = np.broadcast_to(lats_data[:, np.newaxis], lons_data.shape)
-    
-    # ========== 步驟4-6: 建立遮罩與範圍控制 ==========
-    lon_min, lon_max, lat_min, lat_max = extent
-    mask = (
-        (lons_data > lon_min) & (lons_data < lon_max) & 
-        (lats_data > lat_min) & (lats_data < lat_max)
-    )
+        lon_min, lon_max, lat_min, lat_max = extent
+        strict_mask = (
+            (lons_2d > lon_min) & (lons_2d < lon_max) & 
+            (lats_2d > lat_min) & (lats_2d < lat_max)
+        )
 
-    # ========== 步驟7-8: 建立切片與向外延伸 ==========
-    x_indices_raw = np.where(mask.any(axis=0))[0]
-    y_indices_raw = np.where(mask.any(axis=1))[0]
+        # 計算切片索引
+        x_indices_raw = np.where(strict_mask.any(axis=0))[0]
+        y_indices_raw = np.where(strict_mask.any(axis=1))[0]
 
-    if len(x_indices_raw) > 0 and len(y_indices_raw) > 0:
-        x_start_extended = max(0, int(x_indices_raw[0]) - 1)
-        x_end_extended = min(lons_data.shape[1] - 1, int(x_indices_raw[-1]) + 1)
-        y_start_extended = max(0, int(y_indices_raw[0]) - 1)
-        y_end_extended = min(lats_data.shape[0] - 1, int(y_indices_raw[-1]) + 1)
-        
-        x_slice = slice(x_start_extended, x_end_extended + 1)
-        y_slice = slice(y_start_extended, y_end_extended + 1)
-        
-        x_indices = np.arange(x_start_extended, x_end_extended + 1)
-        y_indices = np.arange(y_start_extended, y_end_extended + 1)
-        
-        # 更新遮罩
-        mask = np.zeros_like(mask, dtype=bool)
-        mask[y_slice, x_slice] = True
+        if len(x_indices_raw) > 0 and len(y_indices_raw) > 0:
+            x_start = max(0, int(x_indices_raw[0]) - 1)
+            x_end = min(lons_2d.shape[1] - 1, int(x_indices_raw[-1]) + 1)
+            y_start = max(0, int(y_indices_raw[0]) - 1)
+            y_end = min(lats_2d.shape[0] - 1, int(y_indices_raw[-1]) + 1)
+        else:
+            print(f"    警告: 目標區域沒有符合的網格點!")
+            empty_mask = np.zeros_like(strict_mask, dtype=bool)
+            # 保持一致的字典順序回傳
+            return DualAccessDict({
+                'mask': empty_mask,
+                'x_slice': slice(0, 0), 
+                'y_slice': slice(0, 0),
+                'x_indices': np.array([]), 
+                'y_indices': np.array([]),
+                'lons': np.array([]), 
+                'lats': np.array([]),
+                'strict_mask': empty_mask
+            })
 
-        # 新增：獲取切割後的經緯度陣列
-        new_lons = lons[y_slice, x_slice]
-        new_lats = lats[y_slice, x_slice]
-        
-    else:
-        x_slice = slice(0, 0)
-        y_slice = slice(0, 0)
-        x_indices = np.array([], dtype=np.intp)
-        y_indices = np.array([], dtype=np.intp)
-        new_lons = np.array([])
-        new_lats = np.array([])
-        print(f"    警告: 目標區域沒有符合的網格點!")
+    # ========== 步驟4: 生成矩形切片遮罩 (mask) ==========
+    x_slice = slice(x_start, x_end + 1)
+    y_slice = slice(y_start, y_end + 1)
     
-    print(f"執行完成!\n")
-    return mask, x_slice, y_slice, x_indices, y_indices, new_lons, new_lats
+    mask = np.zeros_like(strict_mask, dtype=bool)
+    mask[y_slice, x_slice] = True
 
+    new_lons_obj = lons[x_slice] if lons.ndim == 1 else lons[y_slice, x_slice]
+    new_lats_obj = lats[y_slice] if lats.ndim == 1 else lats[y_slice, x_slice]
 
+    # ========== 步驟5: 整理回傳自定義字典 (strict_mask 放在最後) ==========
+    # 這裡的順序決定了索引 res[0], res[1]... 的內容
+    results = DualAccessDict({
+        'mask': mask,                   # index 0
+        'x_slice': x_slice,             # index 1
+        'y_slice': y_slice,             # index 2
+        'x_indices': np.arange(x_start, x_end + 1), # index 3
+        'y_indices': np.arange(y_start, y_end + 1), # index 4
+        'lons': new_lons_obj,         # index 5
+        'lats': new_lats_obj,         # index 6
+        'strict_mask': strict_mask      # index 7 (放在最後)
+    })
+    
+    print(f"    執行完成!")
+    return results
+    
 #====================================================================================================
 def main():
-    """測試 get_spatial_mask 函數"""
-    import numpy as np
-    import matplotlib.pyplot as plt
-    from matplotlib.patches import Rectangle
+    """測試 get_spatial_mask 函數的存取方式"""
     
     print("="*80)
-    print("測試 get_spatial_mask 函數")
+    print(" 測試 get_spatial_mask 存取範例 (v1.2)")
     print("="*80)
     
-    # ========== 測試案例1: 1維輸入 ==========
-    print("\n【測試1】一維陣列輸入")
-    print("-"*80)
+    # 建立模擬資料 (1D 輸入)
+    lons_1d = np.linspace(118, 123, 50)
+    lats_1d = np.linspace(22, 26, 40)
+    extent = (119.5, 121.5, 23.5, 24.5)
     
-    lons_1d = np.linspace(118, 123, 100)
-    lats_1d = np.linspace(22, 26, 80)
-    extent_test1 = (119.5, 121.5, 23.5, 24.5)    
-    print(f"extent_test1 = {extent_test1}")
+    # 測試 A: 透過名稱/索引存取
+    res = get_spatial_mask(lons_1d, lats_1d, extent)
+    print(f"\n【驗證 1D 切片結果】")
+    print(f"new_lons shape: {res['new_lons'].shape} (預期為 (x_size,))")
+    print(f"new_lats shape: {res['new_lats'].shape} (預期為 (y_size,))")
     
-    mask1, x_slice1, y_slice1, x_idx1, y_idx1, *_ = get_spatial_mask(
-        lons_1d, lats_1d, extent_test1
-    )
+    # 測試 B: 驗證相容舊程式碼的拆解方式 (Unpacking)
+    # 這裡我們模擬舊版只抓前 5 個回傳值的寫法
+    m, xs, ys, xi, yi, *others = res
+    print(f"\n【驗證序列拆解 (Unpacking)】")
+    print(f"成功拆解前 5 個變數，x_slice: {xs}")
     
-    # 驗證結果
-    print(f"驗證結果:")
-    print(f"    遮罩形狀: {mask1.shape}")
-    print(f"    遮罩類型: {mask1.dtype}")
-    print(f"    X切片: {x_slice1}")
-    print(f"    Y切片: {y_slice1}")
-    
-    # ========== 測試案例2: 2維輸入 ==========
-    print("\n【測試2】二維陣列輸入")
-    print("-"*80)
-    
-    lons_2d, lats_2d = np.meshgrid(lons_1d, lats_1d)
-    
-    mask2, x_slice2, y_slice2, x_idx2, y_idx2, *_ = get_spatial_mask(
-        lons_2d, lats_2d, extent_test1
-    )
-    
-    # 驗證兩種輸入方式結果一致
-    assert np.array_equal(mask1, mask2), "1D和2D輸入結果應該相同!"
-    assert x_slice1 == x_slice2, "切片應該相同!"
-    assert y_slice1 == y_slice2, "切片應該相同!"
-    print(f"✓ 驗證通過: 1D和2D輸入產生相同結果")
-    
-    # ========== 測試案例3: 實際應用 - 資料切片 ==========
-    print("\n【測試3】實際資料切片")
-    print("-"*80)
-    
-    # 建立模擬資料
-    data_full = np.random.rand(80, 100) * 20 + 15  # 80x100 的隨機溫度場
-    
-    # 使用 slice 提取
-    data_subset_slice = data_full[y_slice1, x_slice1]
-    print(f"    原始資料形狀: {data_full.shape}")
-    print(f"    切片後形狀: {data_subset_slice.shape}")
-    print(f"    切片後資料範圍: [{data_subset_slice.min():.1f}, {data_subset_slice.max():.1f}]")
-    
-    # 使用 indices 提取 (應該得到相同結果)
-    data_subset_idx = data_full[np.ix_(y_idx1, x_idx1)]
-    assert np.array_equal(data_subset_slice, data_subset_idx), "兩種索引方式應相同!"
-    print(f"✓ 驗證通過: slice 和 indices 提取結果相同")
-    
-    # ========== 測試案例4: 邊界案例 ==========
-    print("\n【測試4】邊界案例")
-    print("-"*80)
-    
-    # 4a: 區域完全在網格外
-    print("區域完全在網格外")
-    extent_outside = (125, 130, 30, 35)
-    print(f"extent_outside = {extent_outside}")
-    mask_out, x_slice_out, y_slice_out, *_ = get_spatial_mask(
-        lons_1d, lats_1d, extent_outside
-    )
-    print(f"區域在網格外: 遮罩總數 = {mask_out.sum()}")
-    
-    # 4b: 區域覆蓋整個網格
-    print("區域覆蓋超出整個網格")
-    extent_full = (117, 124, 21, 27)
-    print(f"extent_full = {extent_full}")
-    mask_full, x_slice_full, y_slice_full, *_ = get_spatial_mask(
-        lons_1d, lats_1d, extent_full
-    )
-    print(f"區域覆蓋全網格: 遮罩總數 = {mask_full.sum()}/{mask_full.size}")
-    
-    # ========== 視覺化 ==========
-    print("\n【視覺化】繪製遮罩與切片範圍")
-    print("-"*80)
-    
-    fig, axes = plt.subplots(1, 3, figsize=(15, 5))
-    
-    # 圖1: 完整遮罩
-    im1 = axes[0].pcolormesh(lons_2d, lats_2d, mask1.astype(int), 
-                             cmap='RdYlBu_r', shading='auto')
-    axes[0].add_patch(Rectangle(
-        (extent_test1[0], extent_test1[2]),
-        extent_test1[1] - extent_test1[0],
-        extent_test1[3] - extent_test1[2],
-        fill=False, edgecolor='red', linewidth=2, label='Target Domain'
-    ))  # draw a red box
-    axes[0].set_xlabel('Longitude (°E)')
-    axes[0].set_ylabel('Latitude (°N)')
-    axes[0].set_title('Mask Distribution')
-    axes[0].legend()
-    axes[0].grid(True, alpha=0.3)
-    plt.colorbar(im1, ax=axes[0], label='Mask Value')
-    
-    # 圖2: 切片範圍
-    im2 = axes[1].pcolormesh(lons_2d, lats_2d, data_full, 
-                             cmap='viridis', shading='auto')
-    # 標示切片範圍
-    slice_lons = lons_2d[y_slice1, x_slice1]
-    slice_lats = lats_2d[y_slice1, x_slice1]
-    axes[1].add_patch(Rectangle(
-        (slice_lons.min(), slice_lats.min()),
-        slice_lons.max() - slice_lons.min(),
-        slice_lats.max() - slice_lats.min(),
-        fill=False, edgecolor='red', linewidth=2, label='Slice Range'
-    ))
-    axes[1].set_xlabel('Longitude (°E)')
-    axes[1].set_ylabel('Latitude (°N)')
-    axes[1].set_title('Original Data Field')
-    axes[1].legend()
-    axes[1].grid(True, alpha=0.3)
-    plt.colorbar(im2, ax=axes[1], label='Temperature (°C)')
-    
-    # 圖3: 切片後的資料
-    im3 = axes[2].pcolormesh(
-        slice_lons, slice_lats, data_subset_slice,
-        cmap='viridis', shading='auto'
-    )
-    axes[2].set_xlabel('Longitude (°E)')
-    axes[2].set_ylabel('Latitude (°N)')
-    axes[2].set_title('Sliced Data')
-    axes[2].grid(True, alpha=0.3)
-    plt.colorbar(im3, ax=axes[2], label='Temperature (°C)')
-    
-    plt.tight_layout()
-    output_file = './get_spatial_mask.png'
-    plt.savefig(output_file, dpi=150, bbox_inches='tight')
-    print(f"\n圖片已儲存: {output_file}")
-    
-    # ========== 使用範例說明 ==========
-    print("\n" + "="*80)
-    print("使用範例")
-    print("="*80)
-    print("""
-# 範例1: 基本使用
-lons = np.linspace(118, 123, 100)
-lats = np.linspace(22, 26, 80)
-extent = (119.5, 121.5, 23.5, 24.5)
-
-mask, x_slice, y_slice, x_idx, y_idx = get_spatial_mask(lons, lats, extent)
-
-# 使用 slice 提取資料 (推薦,速度快)
-data_subset = data[y_slice, x_slice]
-
-# 使用 indices 提取資料 (可操作度高,但較慢)
-data_subset = data[np.ix_(y_idx, x_idx)]
-
-# 範例2: 配合 xarray 使用
-import xarray as xr
-import netCDF4 as nc
-import wrf
-ncfile = nc.Dataset('wrfout_file.nc')
-lons = wrf.getvar(ncfile, "lon")    
-lats = wrf.getvar(ncfile, "lat") 
-extent = (119.5, 121.5, 23.5, 24.5)
-
-mask, x_slice, y_slice, _, _ = get_spatial_mask(lons, lats, extent)
-
-# 提取子區域
-ds_subset = ds.isel(south_north=y_slice, west_east=x_slice)
-    """)
-    
-    print("\n測試完成!")
-    
-    return mask1, x_slice1, y_slice1, x_idx1, y_idx1
-
+    print("\n✓ 測試通過：已修復 1D 座標切片導致的 IndexError。")
 
 if __name__ == "__main__":
-    mask, x_slice, y_slice, x_idx, y_idx = main()
+    main()

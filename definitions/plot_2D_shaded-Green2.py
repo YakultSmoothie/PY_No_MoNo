@@ -1,347 +1,119 @@
-import os
-import sys
-import glob
-import numpy as np
-import xarray as xr 
-import pandas as pd       
-from matplotlib import colormaps
-from matplotlib.ticker import MaxNLocator
-import matplotlib as matplotlib
-matplotlib.use('TkAgg') # 或 'Qt5Agg'
-import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
-import matplotlib.ticker as mticker     
-import matplotlib.colors as mcolors
-import cartopy.crs as ccrs
-import cartopy.feature as cfeature
-import cartopy.mpl.ticker as cticker   
-from datetime import datetime
-import matplotlib.patheffects as patheffects
-import warnings
-from typing import Union, Optional
-from pathlib import Path
-
 #--------------------------------------------
-# save figure
+# 使用者資訊標註的功能
 #--------------------------------------------
-def add_system_time(fig, 
-                     system_time_info=None, 
-                     offset=(0.00, 0.00), 
-                     fontsize=5, 
-                     color='black', 
-                     silent=False, 
-                     indent=0):
+def add_user_info_text(ax, user_info, 
+                       user_info_loc='upper right',
+                       user_info_fontsize=6,
+                       user_info_offset=(0.00, 0.00),
+                       user_info_color='black',
+                       user_info_stroke_width=0,
+                       user_info_stroke_color='white',
+                       silent=False,
+                       indent=0):
     """
-    在 Figure 右下角添加系統時間標註。
+    在圖表上添加使用者資訊文字標註
     
     參數:
-        fig: matplotlib figure 物件。
-        system_time_info (str/list/tuple): 除了時間外的額外資訊。
-        offset (tuple): 位置偏移量 (x_offset, y_offset)。
-        fontsize (int): 字體大小。
-        color (str): 文字顏色。
-        silent (bool): 是否抑制終端輸出。
-        indent (int): 終端輸出縮排。
-    """
-    from datetime import datetime
-    
-    script_name = os.path.basename(sys.argv[0])
-    current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    base_info = f"Source: {script_name}\nSystem time: {current_time}"
-    
-    # 處理 system_time_info 的格式
-    if system_time_info is None:
-        system_time_str = f'{base_info}'
-    elif isinstance(system_time_info, (list, tuple)):
-        # 如果是列表，將所有元素用換行符連接
-        info_lines = '\n'.join(str(item) for item in system_time_info)
-        system_time_str = f'{info_lines}\n{base_info}'
-    else:
-        # 單一字串
-        system_time_str = f'{system_time_info}\n{base_info}'
-    
-    # 使用 fig.text 在 figure 座標系統中標註 (1.0, 0.0 為右下角)
-    text_obj = fig.text(1.00 + offset[0], 0.00 + offset[1], 
-                        system_time_str, 
-                        fontsize=fontsize, 
-                        color=color, 
-                        alpha=1.0,
-                        ha='right', 
-                        va='bottom',
-                        transform=fig.transFigure,
-                        zorder=100)
-    
-    if not silent:
-        # --- 先處理字串，避免在 f-string 中使用反斜線 ---
-        log_display = system_time_str.replace('\n', ' | ')
-        print(f"{indent}系統時間標註: {log_display}")
-        
-    return text_obj 
-
-#--------------------------------------------
-# save figure
-#--------------------------------------------
-def f2p(
-    figure: Optional[plt.Figure] = None, 
-    out: str = "./f2p_output.png", 
-    do_tight_layout: bool = True, 
-    dpi: int = 180, 
-    bbox_inches: str = 'tight'
-):
-    """
-    plt.figure to .png
-    保存圖像，並可選擇是否執行 tight_layout。
-    """
-
-    # 如果呼叫時沒傳入 pltfigure，則自動抓取當前活動中的 fig
-    target_fig = figure if figure is not None else plt.gcf()
-
-    print("[f2p] Saving file(s) ...")
-
-    if not out:
-        print("警告：未指定 output_path，取消存檔。")
-        return
-
-    # 根據參數決定是否執行 tight_layout
-    if do_tight_layout:
-        target_fig.tight_layout()
-        # print("    已套用 tight_layout 佈局優化。")
-
-    # 建立資料夾
-    Path(out).parent.mkdir(parents=True, exist_ok=True)
-
-    # 存檔
-    target_fig.savefig(out, dpi=dpi, bbox_inches=bbox_inches)
-    print(f"    figure saved: {out}")
-
-#--------------------------------------------
-# UV_grid to UV_lonlat
-#--------------------------------------------
-def rotate_vector(ua, va, cosalpha, sinalpha, component="u"):
-    """
-    根據提供的 cosalpha 和 sinalpha 旋轉向量 (ua, va)。
-    處理wrf資料的話，可以使用 wrf.getvar 從 wrfoutput 中提取 cosalpha 與 sinalpha.
-    
-    公式:
-        U_rot = ua * cosalpha - va * sinalpha
-        V_rot = ua * sinalpha + va * cosalpha
-    
-    參數:
-        ua (array-like): 原始向量的 U 分量。可以是 2D (lat, lon) 或 3D (time, lat, lon) 或更多 (..., lat, lon)。
-        va (array-like): 原始向量的 V 分量。
-        cosalpha (array-like): 旋轉角度的餘弦值。通常為 2D (lat, lon)。
-        sinalpha (array-like): 旋轉角度的正弦值。通常為 2D (lat, lon)。
-        component (str): 指定要返回的分量，"u" 或 "v"。
-                         "u" 對應公式中的 U_rot (例如 East)
-                         "v" 對應公式中的 V_rot (例如 North)
-    
-    Broadcasting 說明:
-        此函式支援 NumPy Broadcasting 機制。
-        如果 ua/va 是 3維 (例如: Time, Lat, Lon)，而 cosalpha/sinalpha 是 2維 (例如: Lat, Lon)，
-        只要最後的維度形狀一致 (Lat, Lon 對應)，程式會自動處理計算。
-    
-    注意:
-        1. 程式會自動提取底層數據以避免 xarray 維度名稱不同導致的對齊錯誤。
-        2. 若輸入數據帶有單位 (例如 xarray 封裝的 Pint Quantity)，輸出結果將會保留單位。
-    
-    返回:
-        array-like: 旋轉後的單一分量結果 (若輸入有單位，則包含單位)
-    """
-    print(f"Run rotate_vector ({component})...")
-
-    # 內部函式：確保輸入轉為數值陣列，但保留單位 (Pint Quantity)
-    # 1. 對於 xarray，使用 .data 而非 .values。
-    #    .values 會強制轉為 numpy (丟失單位)，.data 則會保留底層的 Pint Quantity。
-    #    同時 .data 也不會帶有 xarray 的維度標籤，避免了維度名稱對齊的問題。
-    # 2. 對於 pandas，使用 .values。
-    def _extract_raw_data(arr):
-        if hasattr(arr, 'data'):
-            return arr.data
-        elif hasattr(arr, 'values'):
-            return arr.values
-        return arr
-
-    # 提取數據
-    ua_val = _extract_raw_data(ua)
-    va_val = _extract_raw_data(va)
-    cosalpha_val = _extract_raw_data(cosalpha)
-    sinalpha_val = _extract_raw_data(sinalpha)
-
-    # 統一轉換 component 為小寫以避免大小寫錯誤
-    comp = component.lower()
-    
-    if comp == "u":
-        # 計算旋轉後的 U 分量 (例如 vct_east)
-        return ua_val * cosalpha_val - va_val * sinalpha_val
-        
-    elif comp == "v":
-        # 計算旋轉後的 V 分量 (例如 vct_north)
-        return ua_val * sinalpha_val + va_val * cosalpha_val
-        
-    else:
-        raise ValueError(f"    Component 參數錯誤: '{component}'。請使用 'u' 或 'v'。")
-
-#--------------------------------------------
-# 自動決定網格間隔
-#--------------------------------------------
-def _auto_grid_interval(XX, YY, target_divisions=4, silent=False, indent=0):
-    """
-    根據數據範圍自動決定合適的網格間隔
-    
-    參數:
-        XX (numpy.ndarray): 經度網格座標
-        YY (numpy.ndarray): 緯度網格座標
-        target_divisions (int): 目標分割數，預設4
+        ax: matplotlib axes物件
+        user_info (str or list or None): 使用者自訂資訊文字
+        user_info_loc (str): 使用者資訊的顯示位置
+        user_info_fontsize (int): 使用者資訊的字體大小
+        user_info_offset (tuple): 使用者資訊位置的偏移量(x_offset, y_offset)
+        user_info_color (str): 使用者資訊的文字顏色
+        user_info_stroke_width (float): 描邊寬度
+        user_info_stroke_color (str): 描邊顏色
         silent (bool): 是否抑制輸出
         indent (int): 終端輸出縮排空格數
     
     返回:
-        tuple: (lon_interval, lat_interval) 經度和緯度的網格間隔
+        text_obj: matplotlib text物件（如果有創建的話）
     """
-    import numpy as np
-
+    import matplotlib.patheffects as patheffects
+    
+    if user_info is None:
+        return None
+    
     ind2 = ' ' * (indent + 4)
     
-    # 計算經度和緯度的範圍
-    lon_range = np.nanmax(XX) - np.nanmin(XX)
-    lat_range = np.nanmax(YY) - np.nanmin(YY)
+    # 處理輸入格式
+    if isinstance(user_info, str):
+        info_text = user_info
+    elif isinstance(user_info, (list, tuple)):
+        info_text = '\n'.join(str(item) for item in user_info)
+    else:
+        info_text = str(user_info)
     
-    # 定義好看的間隔選項（從小到大）
-    nice_intervals = [0.01, 0.02, 0.025, 0.05, 0.1, 0.2, 0.25, 0.5, 1, 2, 3, 4, 5, 10, 15, 20, 30, 45, 60, 90, 180]
+    # 根據位置參數決定座標
+    loc_dict = {
+        # 上邊的外面
+        'upper right': (1.00, 1.01, 'right', 'bottom'),
+        'top right': (1.00, 1.01, 'right', 'bottom'),
+        'upper left': (0.00, 1.01, 'left', 'bottom'),
+        'top left': (0.00, 1.01, 'left', 'bottom'),
+        # 下邊的外面
+        'lower right': (1.00, -0.06, 'right', 'top'),
+        'bottom right': (1.00, -0.06, 'right', 'top'),
+        'lower left': (0.00, -0.06, 'left', 'top'),
+        'bottom left': (0.00, -0.06, 'left', 'top'),
+        # right side of ax
+        'right lower': (1.03, -0.06, 'left', 'top'),   
+        'right upper': (1.03, 1.00, 'left', 'top'), 
+        # left side of ax
+        'left lower':  (-0.05, 0.00, 'right', 'bottom'),   
+        'left upper':  (-0.05, 1.00, 'right', 'top'), 
+        # 圖形區域內側四角
+        'inner upper left': (0.01, 0.99, 'left', 'top'),
+        'inner upper right': (0.99, 0.99, 'right', 'top'),
+        'inner lower left': (0.01, 0.01, 'left', 'bottom'),
+        'inner lower right': (0.99, 0.01, 'right', 'bottom'),       
+    }
     
-    def find_nice_interval(data_range, target_div):
-        """找到最接近目標分割數的好看間隔"""
-        target_interval = data_range / target_div
-        # 找到最接近的好看間隔
-        closest_interval = min(nice_intervals, key=lambda x: abs(x - target_interval))
-        return closest_interval
+    if user_info_loc not in loc_dict:
+        if not silent:
+            print(f"{ind2}user_info_loc not in loc_dict")
+        user_info_loc = 'upper right'
+        if not silent:
+            print(f"{ind2}    user_info_loc was changed to {user_info_loc}")
     
-    lon_interval = find_nice_interval(lon_range, target_divisions)
-    lat_interval = find_nice_interval(lat_range, target_divisions)
+    x_pos, y_pos, ha, va = loc_dict[user_info_loc]    
     
-    if not silent:
-        print(f"{ind2}    數據範圍: 經度 {np.nanmin(XX):.2f}°–{np.nanmax(XX):.2f}° (跨度 {lon_range:.2f}°)")
-        print(f"{ind2}    數據範圍: 緯度 {np.nanmin(YY):.2f}°–{np.nanmax(YY):.2f}° (跨度 {lat_range:.2f}°)")
-        print(f"{ind2}    自動設定網格間隔(_auto_grid_interval): ")
+    # 應用位置偏移量
+    x_pos = x_pos + user_info_offset[0]
+    y_pos = y_pos + user_info_offset[1]
     
-    return (lon_interval, lat_interval)
-
-#--------------------------------------------
-# 使用者資訊標註的功能
-#--------------------------------------------
-# def _add_user_info_text(ax, user_info, 
-#                        user_info_loc='upper right',
-#                        user_info_fontsize=6,
-#                        user_info_offset=(0.00, 0.00),
-#                        user_info_color='black',
-#                        user_info_stroke_width=0,
-#                        user_info_stroke_color='white',
-#                        silent=False,
-#                        indent=0):
-#     """
-#     在圖表上添加使用者資訊文字標註
+    # 創建文字物件
+    text_obj = ax.text(x_pos, y_pos, info_text,
+                      horizontalalignment=ha,
+                      verticalalignment=va,
+                      transform=ax.transAxes,
+                      fontsize=user_info_fontsize,
+                      color=user_info_color,
+                      alpha=1.0,
+                      zorder=95)
     
-#     參數:
-#         ax: matplotlib axes物件
-#         user_info (str or list or None): 使用者自訂資訊文字
-#         user_info_loc (str): 使用者資訊的顯示位置
-#         user_info_fontsize (int): 使用者資訊的字體大小
-#         user_info_offset (tuple): 使用者資訊位置的偏移量(x_offset, y_offset)
-#         user_info_color (str): 使用者資訊的文字顏色
-#         user_info_stroke_width (float): 描邊寬度
-#         user_info_stroke_color (str): 描邊顏色
-#         silent (bool): 是否抑制輸出
-#         indent (int): 終端輸出縮排空格數
-    
-#     返回:
-#         text_obj: matplotlib text物件（如果有創建的話）
-#     """
-#     import matplotlib.patheffects as patheffects
-    
-#     if user_info is None:
-#         return None
-    
-#     ind2 = ' ' * (indent + 4)
-    
-#     # 處理輸入格式
-#     if isinstance(user_info, str):
-#         info_text = user_info
-#     elif isinstance(user_info, (list, tuple)):
-#         info_text = '\n'.join(str(item) for item in user_info)
-#     else:
-#         info_text = str(user_info)
-    
-#     # 根據位置參數決定座標
-#     loc_dict = {
-#         # 上邊的外面
-#         'upper right': (1.00, 1.01, 'right', 'bottom'),
-#         'top right': (1.00, 1.01, 'right', 'bottom'),
-#         'upper left': (0.00, 1.01, 'left', 'bottom'),
-#         'top left': (0.00, 1.01, 'left', 'bottom'),
-#         # 下邊的外面
-#         'lower right': (1.00, -0.06, 'right', 'top'),
-#         'bottom right': (1.00, -0.06, 'right', 'top'),
-#         'lower left': (0.00, -0.06, 'left', 'top'),
-#         'bottom left': (0.00, -0.06, 'left', 'top'),
-#         # right side of ax
-#         'right lower': (1.03, -0.06, 'left', 'top'),   
-#         'right upper': (1.03, 1.00, 'left', 'top'), 
-#         # left side of ax
-#         'left lower':  (-0.05, 0.00, 'right', 'bottom'),   
-#         'left upper':  (-0.05, 1.00, 'right', 'top'), 
-#         # 圖形區域內側四角
-#         'inner upper left': (0.01, 0.99, 'left', 'top'),
-#         'inner upper right': (0.99, 0.99, 'right', 'top'),
-#         'inner lower left': (0.01, 0.01, 'left', 'bottom'),
-#         'inner lower right': (0.99, 0.01, 'right', 'bottom'),       
-#     }
-    
-#     if user_info_loc not in loc_dict:
-#         if not silent:
-#             print(f"{ind2}user_info_loc not in loc_dict")
-#         user_info_loc = 'upper right'
-#         if not silent:
-#             print(f"{ind2}    user_info_loc was changed to {user_info_loc}")
-    
-#     x_pos, y_pos, ha, va = loc_dict[user_info_loc]    
-    
-#     # 應用位置偏移量
-#     x_pos = x_pos + user_info_offset[0]
-#     y_pos = y_pos + user_info_offset[1]
-    
-#     # 創建文字物件
-#     text_obj = ax.text(x_pos, y_pos, info_text,
-#                       horizontalalignment=ha,
-#                       verticalalignment=va,
-#                       transform=ax.transAxes,
-#                       fontsize=user_info_fontsize,
-#                       color=user_info_color,
-#                       alpha=1.0,
-#                       zorder=95)
-    
-#     # 根據 stroke_width 決定是否添加描邊效果
-#     if user_info_stroke_width > 0:
-#         outline_effect = patheffects.withStroke(
-#             linewidth=user_info_stroke_width,
-#             foreground=user_info_stroke_color
-#         )
-#         text_obj.set_path_effects([outline_effect])
+    # 根據 stroke_width 決定是否添加描邊效果
+    if user_info_stroke_width > 0:
+        outline_effect = patheffects.withStroke(
+            linewidth=user_info_stroke_width,
+            foreground=user_info_stroke_color
+        )
+        text_obj.set_path_effects([outline_effect])
         
-#         if not silent:
-#             print(f"{ind2}使用者資訊標註於: {user_info_loc} (含描邊效果)")
-#             print(f"{ind2}    文字: {user_info_color}，描邊: {user_info_stroke_color} (寬度={user_info_stroke_width})")
-#             print(f"{ind2}    內容: {info_text}")
-#     else:
-#         if not silent:
-#             print(f"{ind2}使用者資訊標註於: {user_info_loc}")
-#             print(f"{ind2}    內容: {info_text}")
+        if not silent:
+            print(f"{ind2}使用者資訊標註於: {user_info_loc} (含描邊效果)")
+            print(f"{ind2}    文字: {user_info_color}，描邊: {user_info_stroke_color} (寬度={user_info_stroke_width})")
+            print(f"{ind2}    內容: {info_text}")
+    else:
+        if not silent:
+            print(f"{ind2}使用者資訊標註於: {user_info_loc}")
+            print(f"{ind2}    內容: {info_text}")
     
-#     return text_obj
+    return text_obj
 
 #--------------------------------------------
 # 向量場圖例繪製功能
 #--------------------------------------------
-def _add_vector_quiverkey(ax, qu, qk_x, qk_y, vref, vector_unit_str,
+def add_vector_quiverkey(ax, qu, qk_x, qk_y, vref, vector_unit_str,
                         vx_bai=None, vy_bai=None,
                         vkey_labelpos='W',
                         color_quiverkey='black',
@@ -451,20 +223,19 @@ def _add_vector_quiverkey(ax, qu, qk_x, qk_y, vref, vector_unit_str,
             print(f"{ind2}     圖例y: {y_label}")
     
     return quiverkey_list
-
 #--------------------------------------------
 # 加粗座標軸的邊框
 #--------------------------------------------
-# def _draw_ol(ax, linewidth=2.7, color='black', zorder=99):
-#     """加粗座標軸的邊框"""
-#     for spine in ax.spines.values():
-#         spine.set_linewidth(linewidth)
-#         spine.set_edgecolor(color)
-#         if zorder is not None:
-#             spine.set_zorder(zorder)
+def draw_ol(ax, linewidth=2.7, color='black', zorder=99):
+    """加粗座標軸的邊框"""
+    for spine in ax.spines.values():
+        spine.set_linewidth(linewidth)
+        spine.set_edgecolor(color)
+        if zorder is not None:
+            spine.set_zorder(zorder)
 
 #--------------------------------------------
-# 視覺化一個輸入陣列  ++ MAIN FUNCTION ++
+# 視覺化一個輸入陣列
 #--------------------------------------------
 def plot_2D_shaded(array, x=None, y=None, 
                    levels=None, 
@@ -487,7 +258,7 @@ def plot_2D_shaded(array, x=None, y=None,
                    # output
                    figsize=(6, 5), 
                    o=None, 
-                   dpi=180, 
+                   dpi=200, 
                    bbox_inches='tight',   # None, 'tight', Bbox([[0.5, 0.5], [5.5, 4.5]])
                    ax=None, fig=None, 
                    show=True, 
@@ -526,8 +297,8 @@ def plot_2D_shaded(array, x=None, y=None,
                    invert_xaxis=False, invert_yaxis=False,
                    
                    # coastline
-                   coastline_color=('black', 'yellow'),  # When coastline_color=None, do not draw coastline
-                   coastline_width=(2.0, 0), 
+                   coastline_color=('black', 'yellow'), 
+                   coastline_width=(1.0, 0), 
                    coastline_resolution='50m',
 
                    # grid line
@@ -543,7 +314,7 @@ def plot_2D_shaded(array, x=None, y=None,
                    grid_alpha = 0.6, 
                    grid_zordwr = 9, 
                    grid_color = 'gray', 
-                   gxylim=None,   # 例如：(100, 140, 15, 45)
+                   gxylim=None,
 
                    # vector
                    vx=None, vy=None, 
@@ -564,9 +335,6 @@ def plot_2D_shaded(array, x=None, y=None,
                    cwidth=(0.8, 2.0), 
                    ctype=('-', '-'), cntype=('--', '--'), 
                    clab=(False, True),
-                   clab_fontweight=(5, 5),  # 新增參數
-                   clab_manuals1: list[tuple[float, float]] | bool =False,     # 標籤位置
-                   clab_manuals2: list[tuple[float, float]] | bool =False,
                    czorder=None,  
                    
                    silent=False
@@ -594,7 +362,7 @@ def plot_2D_shaded(array, x=None, y=None,
                   norm=LogNorm(vmin=1e-17, vmax=1e17),
                   colorbar_ticks=np.logspace(-17, 17, 18),
         cmap (str): 使用的色彩映射名稱，預設'viridis'
-            常用選項：turbo, jet, RdBu_r, seismic, BrBG, binary, pink
+            常用選項：turbo, jet, RdBu_r, seismic, BrBG
         annotation (bool): 是否顯示統計數據註釋(panel的左下角)，預設
 
     ============ Colorbar 參數說明 ============
@@ -653,9 +421,9 @@ def plot_2D_shaded(array, x=None, y=None,
         coastline (tuple or None): 海岸線顏色(外層, 內層)，預設('black', 'yellow')
             - tuple: (外層顏色, 內層顏色)，繪製雙層海岸線增強可見度
             - None: 不繪製海岸線
-        coastline_width (tuple): 海岸線寬度(外層, 內層)，預設(2.0, 0)
+        coastline_width (tuple): 海岸線寬度(外層, 內層)，預設(1.0, 0)
             - (外層線寬, 內層線寬)，外層應略粗於內層
-            例如：(2.0, 0.3), (1.5, 1.0)        
+            例如：(2.0, 1.5), (1.5, 1.0)        
         coastline_resolution (str): 海岸線解析度，預設'50m'
             - '10m': 高解析度，適合區域地圖
             - '50m': 中解析度，適合一般用途
@@ -719,7 +487,7 @@ def plot_2D_shaded(array, x=None, y=None,
 
     === 輸出控制參數 ===
         o (str): 輸出檔案路徑，如果為None則不保存
-        dpi (int): 圖像解析度，預設180
+        dpi (int): 圖像解析度，預設150
         silent (bool): 是否抑制統計資訊的終端輸出，預設False
         
     === 圖形物件參數 ===
@@ -790,19 +558,6 @@ def plot_2D_shaded(array, x=None, y=None,
         clab (tuple or list of tuple): 是否標示數值(細線, 粗線)，預設(False, True) 只在粗線上標註數值
             - (True, True): 細線和粗線都標註數值
             - (False, False): 都不標註
-        clab_fontweight (tuple or list of tuple): 等值線標籤字重(細線, 粗線)，預設(5, 5)
-            - tuple: 單組等值線的字重，例如：(4, 6)表示細線用4，粗線用6
-            - list of tuple: 多組等值線各自的字重
-            - 常用值：3(細), 4(正常), 5(稍粗), 6(粗), 7(很粗), 8(極粗)
-                例如：[(4, 6), (5, 7)]
-        clab_manuals1 (bool or list of tuples): 細線標籤位置，預設 False
-            - False: 使用預設自動標籤位置
-            - list of tuples: 手動指定標籤座標 (x, y)
-            - 例如：[(120, 20), (110, 30), (140, 10)]
-        clab_manuals2 (bool or list of tuples): 粗線標籤位置，預設 False
-            - False: 使用預設自動標籤位置
-            - list of tuples: 手動指定標籤座標 (x, y)
-            - 例如：[(120, 20), (110, 30), (140, 10)]
         czorder (int or list of int or None): 等值線的繪圖層級(zorder)，預設None
             - None: 自動設定，第一組為70，之後每組+1 (70, 71, 72, ...)
             - int: 單一值，所有等值線使用相同zorder
@@ -864,26 +619,10 @@ def plot_2D_shaded(array, x=None, y=None,
             - 常用組合：黑色文字配白色描邊，或白色文字配黑色描邊
             例如：user_info_color='white', user_info_stroke_color='black'   
 
-    v1.20.4 2026-01-13 微調自動設定 levels 的邏輯
-    v1.20.3 2025-12-31 微調存檔方式 
-    v1.20.2 2025-12-30 指定打開互動端 matplotlib.use('TkAgg') 
-    v1.19.2 2025-12-16 修正 user_info 的讀取方式錯誤
-    v1.19.1 2025-11-13 調整 function 導入方式
-    v1.19 2025-11-09 網格間隔自動設定邏輯優化
-                        - 新增 _auto_grid_interval 函數：根據數據範圍自動決定網格間隔
-                          作用於grid_type == 2 和 grid_type == 3 
-                     增加 clab_manuals1 and clab_manuals2 參數
-                        - False 表示使用預設clab標籤位置
-                        - 輸入 List of tuples containing (x, y) coordinates 會在這些位置貼標籤
-                            - 例如 clab_manuals2 = [(120, 20), (110, 30), (140, 10)] 
-                     等值線不再以多變數等值線進行開發
-    v1.18 2025-11-07 調整clevels的選取邏輯
-                        新增參數clab_fontweight 
-                        調整 自動設定 vref 的邏輯
     v1.17.1 2025-11-02 將刻度線移到色條內側. 微調預設參數
-                        增加 fig_info 參數，可在 figure 左上角添加標註文字
-                        增加 alpha 參數,alpha=0 效果等於不畫色階
-                        向量的圖例增加描邊效果
+                       增加 fig_info 參數，可在 figure 左上角添加標註文字
+                       增加 alpha 參數,alpha=0 效果等於不畫色階
+                       向量的圖例增加描邊效果
     v1.17 2025-10-27 調整axes.unicode_minus
     v1.16 2025-10-26 user_info 增加描邊效果與內側位置選項
                      user_info 的區塊提取成一個獨立的函數
@@ -949,6 +688,22 @@ def plot_2D_shaded(array, x=None, y=None,
         numpy.ndarray: YY - 網格緯度座標
     '''
 
+
+    import numpy as np
+    import xarray as xr 
+    import pandas as pd       
+    from matplotlib import colormaps
+    from matplotlib.ticker import MaxNLocator
+    import matplotlib as matplotlib
+    import matplotlib.pyplot as plt
+    import matplotlib.dates as mdates
+    import matplotlib.ticker as mticker     
+    import matplotlib.colors as mcolors
+    import cartopy.crs as ccrs
+    import cartopy.feature as cfeature
+    import cartopy.mpl.ticker as cticker   
+    from datetime import datetime
+    import matplotlib.patheffects as patheffects
     
     # 建立縮排字串
     ind = ' ' * indent
@@ -1067,8 +822,7 @@ def plot_2D_shaded(array, x=None, y=None,
         if len(data_valid) > 0:
             # 使用Sturges公式計算適當的等級數
             n_bins = int(np.ceil(np.log2(len(data_valid)) + 1))
-            # levels = MaxNLocator(nbins=n_bins+40).tick_values(np.percentile(data_valid, 2.5), np.percentile(data_valid, 97.5))
-            levels = MaxNLocator(nbins=n_bins+40).tick_values(np.percentile(data_valid, 0.5), np.percentile(data_valid, 99.5))
+            levels = MaxNLocator(nbins=n_bins+40).tick_values(np.percentile(data_valid, 2.5), np.percentile(data_valid, 97.5))
         else:
             levels = np.linspace(data_min, data_max, 11)  # 默認範圍
     
@@ -1116,7 +870,7 @@ def plot_2D_shaded(array, x=None, y=None,
     # 創建網格數據
     if x is None and y is None:
         # 沒有提供經緯度,使用索引
-        print(f"{ind2}        create XX and YY by np.meshgrid(np.arange(cols), np.arange(rows))")
+        print(f"{ind2}        create XX and YY by np.meshgrid(np.arange(cols), np.arange(rows)")
         XX, YY = np.meshgrid(np.arange(cols), np.arange(rows))
     elif x is not None and y is not None:
         print(f"{ind2}        create XX and YY from input x and y")
@@ -1170,8 +924,9 @@ def plot_2D_shaded(array, x=None, y=None,
     
     stats['contourf'] = cf
 
-    from definitions.draw_ol import draw_ol as draw_ol
-    draw_ol(ax, linewidth=2.0)
+    # 加粗框
+    #from definitions.draw_ol import draw_ol as draw_ol
+    draw_ol(ax)
     
     # 添加標題和軸標籤    
     if title:
@@ -1240,9 +995,8 @@ def plot_2D_shaded(array, x=None, y=None,
         if colorbar_label is not None:
             # 使用者指定的標籤
             if colorbar_label in ['', ' ', 'nolabel', 'None', 'no']:
-                cbar.set_label(" ", fontsize=10)
                 if not silent:
-                    print(f"{ind2}        使用者自訂 colorbar_label='no': colorbar_label為空白")
+                    print(f"{ind2}        使用者自訂colorbar_label: nolabel")
             else:
                 cbar.set_label(colorbar_label, fontsize=10)
                 if not silent:
@@ -1252,12 +1006,10 @@ def plot_2D_shaded(array, x=None, y=None,
             auto_label = f'[{unit_str}]'
             cbar.set_label(auto_label, fontsize=10)
             if not silent:
-                print(f"{ind2}        發現數據帶有單位, 單位: {unit_str}")
                 print(f"{ind2}        自動設定colorbar_label: {auto_label}")
         else:
-            cbar.set_label(" ", fontsize=10)
             if not silent:
-                print(f"{ind2    }    自動設定colorbar_label: 未發現數據帶有單位，colorbar_label為空白")
+                print(f"{ind2    }    自動設定colorbar_label: 未發現單位，不顯示colorbar_label")
     
     # 添加統計信息在圖的左下角
     ng = 3
@@ -1316,19 +1068,9 @@ def plot_2D_shaded(array, x=None, y=None,
             from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
             print(f"{ind2}    grid type: gridlines with labels (for PlateCarree)")   
 
-            # 如果沒有指定網格間隔,根據海岸線解析度自動設定            
+            # 如果沒有指定網格間隔,根據海岸線解析度自動設定
             if grid_int is None:
-                try:
-                    # 優先嘗試根據資料範圍自動計算網格間隔
-                    if gxylim is not None:
-                        grid_int = _auto_grid_interval(np.array([gxylim[0], gxylim[1]]), 
-                                                    np.array([gxylim[2], gxylim[3]]),
-                                                    silent=silent, indent=indent)                
-                    else:
-                        grid_int = _auto_grid_interval(XX, YY, silent=silent, indent=indent)
-                except Exception:
-                    # 如果自動計算失敗,則使用預設的海岸線解析度對應值
-                    grid_int = {'10m': (2, 2), '50m': (10, 10), '110m': (30, 30)}.get(coastline_resolution, (10, 10))        
+                grid_int = {'10m': (2, 2), '50m': (10, 10), '110m': (30, 30)}.get(coastline_resolution, (10, 10))
             
             xlocs = np.sort(np.concatenate([-np.arange(grid_int[0], 361, grid_int[0])[::-1], np.arange(0, 361, grid_int[0])]))
             ylocs = np.sort(np.concatenate([-np.arange(grid_int[1], 91, grid_int[1])[::-1], np.arange(0, 91, grid_int[1])]))            
@@ -1364,25 +1106,17 @@ def plot_2D_shaded(array, x=None, y=None,
                 ax.set_extent(gxylim, crs=transform)
                 print(f"{ind2}    map extent: {ax.get_extent()}")
             else:
-                extent_auto = (np.nanmin(XX), np.nanmax(XX), np.nanmin(YY), np.nanmax(YY))
+                extent_auto = (XX.max(), XX.min(), YY.max(), YY.min())
                 ax.set_extent(extent_auto, crs=transform)                
                 print(f"{ind2}    auto map extent: ({extent_auto[0]:.6g}, {extent_auto[1]:.6g}, {extent_auto[2]:.6g}, {extent_auto[3]:.6g})")
 
         elif (grid_type == None and type(projection).__name__ == 'LambertConformal') or (grid_type == 2) or (grid_type == 'Lambert'):            
             print(f"{ind2}    grid type: gridlines with labels (for LambertConformal)")
-            # 設定經緯度網格線 - for ccrs.LambertConformal            
+            # 設定經緯度網格線 - for ccrs.LambertConformal
+
+            # 如果沒有指定網格間隔,根據海岸線解析度自動設定
             if grid_int is None:
-                try:
-                    # 優先嘗試根據資料範圍自動計算網格間隔
-                    if gxylim is not None:
-                        grid_int = _auto_grid_interval(np.array([gxylim[0], gxylim[1]]), 
-                                                    np.array([gxylim[2], gxylim[3]]),
-                                                    silent=silent, indent=indent)                
-                    else:
-                        grid_int = _auto_grid_interval(XX, YY, silent=silent, indent=indent)
-                except Exception:
-                    # 如果自動計算失敗,則使用預設的海岸線解析度對應值
-                    grid_int = {'10m': (2, 2), '50m': (10, 10), '110m': (30, 30)}.get(coastline_resolution, (10, 10))
+                grid_int = {'10m': (2, 2), '50m': (10, 10), '110m': (30, 30)}.get(coastline_resolution, (10, 10))
 
             # 生成全球網格線位置
             xlocs_all = np.sort(np.concatenate([-np.arange(grid_int[0], 361, grid_int[0])[::-1], np.arange(0, 361, grid_int[0])]))
@@ -1401,10 +1135,10 @@ def plot_2D_shaded(array, x=None, y=None,
             # 如果使用者手動指定網格線位置,覆寫自動生成的位置
             if grid_xticks is not None:
                 xlocs = grid_xticks
-                print(f"{ind2}    user set grid_xticks, xlocs changed: {xlocs}")
+                print(f"{ind2}    user set xlocs: {xlocs}")
             if grid_yticks is not None:
                 ylocs = grid_yticks
-                print(f"{ind2}    user set grid_yticks, ylocs changed: {ylocs}")
+                print(f"{ind2}    user set ylocs: {ylocs}")
 
             gl = ax.gridlines(
                 draw_labels={'bottom': 'x', 'left': 'y'},  # 明確指定標籤位置
@@ -1431,8 +1165,8 @@ def plot_2D_shaded(array, x=None, y=None,
             if gxylim is not None:
                 ax.set_extent(gxylim, crs=transform)
                 print(f"{ind2}    map extent: {ax.get_extent()}")
-            #else:            
-            #    extent_auto = (np.nanmin(XX), np.nanmax(XX), np.nanmin(YY), np.nanmax(YY))
+            #else:
+            #    extent_auto = (XX.max(), XX.min(), YY.max(), YY.min())
             #    ax.set_extent(extent_auto, crs=transform)                
             #    print(f"{ind2}    auto map extent: ({extent_auto[0]:.6g}, {extent_auto[1]:.6g}, {extent_auto[2]:.6g}, {extent_auto[3]:.6g})")
 
@@ -1480,7 +1214,6 @@ def plot_2D_shaded(array, x=None, y=None,
         
     else:        
         print(f"{ind2}    grid disabled")
-    
     
 
     # ============ 向量場繪製 ============
@@ -1560,20 +1293,19 @@ def plot_2D_shaded(array, x=None, y=None,
                 #vscale = float(f"{vec_max * 4:.3g}")  # 取3位有效數字
                 vscale = float(f"{np.nanpercentile(wind_speed, 97) * 4:.3g}")  # 取3位有效數字
                 if not silent:
-                    print(f"{ind2}    自動設定 vscale: {vscale:.3g}")
+                    print(f"{ind2}    自動設定vscale: {vscale:.3g}")
             else:
                 if not silent:
-                    print(f"{ind2}    使用者輸入 vscale: {vscale}")
+                    print(f"{ind2}    使用者輸入vscale: {vscale}")
             
             # 自動設定參考長度（如果沒有提供）
             if vref is None:
-                # vref = float(f"{vec_max * 0.95:.2g}")  # 取兩位有效數字
-                vref = float(f"{np.nanpercentile(wind_speed, 97):.2g}")  # 取兩位有效數字
+                vref = float(f"{vec_max * 0.95:.2g}")  # 取兩位有效數字
                 if not silent:
-                    print(f"{ind2}    自動設定 vref: {vref:.2g}")
+                    print(f"{ind2}    自動設定vref: {vref:.2g}")
             else:
                 if not silent:
-                    print(f"{ind2}    使用者輸入 vref: {vref}")
+                    print(f"{ind2}    使用者輸入vref: {vref}")
         else:
             if not silent:
                 print(f"{ind2}    !! 向量場無有效數據 !!")
@@ -1688,7 +1420,7 @@ def plot_2D_shaded(array, x=None, y=None,
                 vkey_color = 'black'       
         
         # 繪製主體quiverkey - 使用新函數
-        quiverkey_list = _add_vector_quiverkey(
+        quiverkey_list = add_vector_quiverkey(
             ax=ax, qu=qu, 
             qk_x=qk_x, qk_y=qk_y, 
             vref=vref, 
@@ -1763,7 +1495,6 @@ def plot_2D_shaded(array, x=None, y=None,
         ctype_list = _make_list(ctype, n_contours, 'ctype')
         cntype_list = _make_list(cntype, n_contours, 'cntype')
         clab_list = _make_list(clab, n_contours, 'clab')
-        clab_fontweight_list = _make_list(clab_fontweight, n_contours, 'clab_fontweight')  # 新增
         czorder_list = _make_list(czorder, n_contours, 'czorder')  
                 
         # 初始化統計資訊字典
@@ -1783,7 +1514,6 @@ def plot_2D_shaded(array, x=None, y=None,
             ctype_current = ctype_list[i_cnt]
             cntype_current = cntype_list[i_cnt]
             clab_current = clab_list[i_cnt]
-            clab_fontweight_current = clab_fontweight_list[i_cnt]  # 新增
             #czorder_list = czorder_list[i_cnt]
             
             # 處理等值線數據（支援xarray和pint）
@@ -1838,19 +1568,9 @@ def plot_2D_shaded(array, x=None, y=None,
                 if clevels_current is None and cints_current is None:
                     n_bins = int(np.ceil(np.log2(len(cnt_valid)) + 1))
                     all_levels = MaxNLocator(nbins=n_bins).tick_values(
-                        np.min(cnt_valid), np.max(cnt_valid))
-                    clevels1 = all_levels   
-                    if np.min(cnt_valid) < 0 < np.max(cnt_valid):
-                        if 0 not in all_levels:
-                            warnings.warn("Warning, all_levels 未包含0 !")           
-                    # 如果clevels1中有0，調整起始索引使clevels2包含0
-                    if 0 in clevels1:
-                        zero_idx = np.where(clevels1 == 0)[0][0]  # 找到0的索引
-                        start_idx = zero_idx % 4  # 計算起始索引，使得跳4時會包含0
-                        clevels2 = all_levels[start_idx::4]
-                    else:
-                        clevels2 = all_levels[::4]
-                    print(f"{ind2}        auto clevels setting. all_levels: {all_levels}")
+                        np.max(cnt_valid)-1, np.min(cnt_valid)+1)
+                    clevels1 = all_levels
+                    clevels2 = all_levels[::4]
 
                 elif clevels_current is None and cints_current is not None:
                     cmaxs = np.ceil(np.max(cnt_valid) / np.array(cints_current)) * np.array(cints_current)
@@ -1867,7 +1587,7 @@ def plot_2D_shaded(array, x=None, y=None,
                     clevels1 = np.round(clevels1, n_clevels_round)
                     clevels2 = np.round(clevels2, n_clevels_round)
                     if not silent:
-                        print(f"{ind2}        user set cints. 等值線間隔: {cints_current} (clevels四捨五入至小數點後{n_clevels_round}位)")
+                        print(f"{ind2}        等值線間隔: {cints_current}")
                 else:
                     clevels1, clevels2 = clevels_current
                
@@ -1915,11 +1635,9 @@ def plot_2D_shaded(array, x=None, y=None,
                     if clab_current[0]:
                         labels1 = ax.clabel(contours1, inline=True, fontsize=10,
                                            fmt=lambda x: f'{x:g}' if x >= 0 else f'–{abs(x):g}',
-                                           manual=clab_manuals1,
                                            inline_spacing=1, zorder=zorder_base+6)
                         for label in labels1:
-                            # 對每個標籤逐一進行修改                       
-                            label.set_fontweight(clab_fontweight_current[0]*100)  # 根據測試, 只支援200～900
+                            label.set_fontweight(500)
                             label.set_fontsize(10)
                 
                 # 繪製粗線等值線
@@ -1939,12 +1657,10 @@ def plot_2D_shaded(array, x=None, y=None,
                     
                     if clab_current[1]:
                         labels2 = ax.clabel(contours2, inline=True, fontsize=10,
-                                           fmt=lambda x: f'{x:g}' if x >= 0 else f'–{abs(x):g}',                               
-                                           manual=clab_manuals2,
+                                           fmt=lambda x: f'{x:g}' if x >= 0 else f'–{abs(x):g}',
                                            inline_spacing=1, zorder=zorder_base+6)
-                        for label in labels2:     
-                            # 對每個標籤逐一進行修改                       
-                            label.set_fontweight(clab_fontweight_current[1]*100)  # 使用參數
+                        for label in labels2:
+                            label.set_fontweight(500)
                             label.set_fontsize(10)
 
                 # 儲存等值線levels到統計資訊
@@ -1973,15 +1689,29 @@ def plot_2D_shaded(array, x=None, y=None,
     
     # ============ 系統時間標註 ============
     if system_time:
-        add_system_time(
-            fig=fig,
-            system_time_info=system_time_info,
-            offset=system_time_offset,
-            fontsize=system_time_fontsize,
-            color=system_time_color,
-            silent=silent,
-            indent=indent
-        )
+        from datetime import datetime
+        current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        
+        # 處理 system_time_info 的格式
+        if system_time_info is None:
+            system_time_str = f'{current_time}'
+        elif isinstance(system_time_info, (list, tuple)):
+            # 如果是列表，將所有元素用換行符連接
+            info_lines = '\n'.join(str(item) for item in system_time_info)
+            system_time_str = f'{current_time}\n{info_lines}'
+        else:
+            # 單一字串
+            system_time_str = f'{current_time}\n{system_time_info}'
+        
+        # 使用 fig.text 在 figure 座標系統中標註
+        # 位置表示右下角，略微偏移避免貼邊
+        fig.text(1.00+system_time_offset[0], 0.00+system_time_offset[1], system_time_str, 
+                fontsize=system_time_fontsize, color=system_time_color, alpha=1.0,
+                ha='right', va='bottom',
+                transform=fig.transFigure,
+                zorder=100)
+        if not silent:
+            print(f"{ind2}系統時間標註: {system_time_str}")
 
     # ============ Figure 資訊標註 ============
     if fig_info is not None:        
@@ -2025,37 +1755,34 @@ def plot_2D_shaded(array, x=None, y=None,
     
     # ============ 使用者資訊標註 ============
     if user_info is not None:
-        from definitions.add_user_info_text import add_user_info_text as add_user_info_text
         # 判斷是單組還是多組
         if isinstance(user_info, list) and len(user_info) > 0 and isinstance(user_info[0], dict):
             # 多組設定，每組是一個dict
             for info_dict in user_info:
                 add_user_info_text(ax, 
-                                 #dict.get('text'),
-                                 info_dict.get('text'),  # <--- 修正這裡：將 dict 改為 info_dict
-                                 loc=info_dict.get('loc', user_info_loc),
-                                 fontsize=info_dict.get('fontsize', user_info_fontsize),
-                                 offset=info_dict.get('offset', user_info_offset),
-                                 color=info_dict.get('color', user_info_color),
-                                 stroke_width=info_dict.get('stroke_width', user_info_stroke_width),
-                                 stroke_color=info_dict.get('stroke_color', user_info_stroke_color),
+                                 info_dict.get('text'),
+                                 user_info_loc=info_dict.get('loc', user_info_loc),
+                                 user_info_fontsize=info_dict.get('fontsize', user_info_fontsize),
+                                 user_info_offset=info_dict.get('offset', user_info_offset),
+                                 user_info_color=info_dict.get('color', user_info_color),
+                                 user_info_stroke_width=info_dict.get('stroke_width', user_info_stroke_width),
+                                 user_info_stroke_color=info_dict.get('stroke_color', user_info_stroke_color),
                                  silent=silent,
                                  indent=indent)
         else:
             # 單組設定
             add_user_info_text(ax, user_info,
-                              loc=user_info_loc,
-                              fontsize=user_info_fontsize,
-                              offset=user_info_offset,
-                              color=user_info_color,
-                              stroke_width=user_info_stroke_width,
-                              stroke_color=user_info_stroke_color,
+                              user_info_loc=user_info_loc,
+                              user_info_fontsize=user_info_fontsize,
+                              user_info_offset=user_info_offset,
+                              user_info_color=user_info_color,
+                              user_info_stroke_width=user_info_stroke_width,
+                              user_info_stroke_color=user_info_stroke_color,
                               silent=silent,
                               indent=indent)
 
     # ============ After Draw ============
     plt.rcParams['font.sans-serif'] = ['DejaVu Sans', 'Arial', 'sans-serif']
-    #plt.rcParams['font.sans-serif'] = ['WenQuanYi Micro Hei', 'Droid Sans Fallback', 'DejaVu Sans', 'Arial', 'sans-serif']  #使用中文字體會導致長負號顯示錯誤，所以不能使用
     plt.rcParams['axes.unicode_minus'] = True  # 使用長負號
     if not silent:
         print(f"{ind2}Current font: {matplotlib.rcParams['font.sans-serif']}")
@@ -2064,16 +1791,15 @@ def plot_2D_shaded(array, x=None, y=None,
     if show:
         fig.tight_layout()
         fig.show()  # 只在show=True時顯示
-        print('show: True')        
-    else:
-        print('show: False')
 
     # 保存圖像    
     if o:        
-        f2p(fig, out=o, do_tight_layout=True, dpi=dpi, bbox_inches='tight')
+        fig.tight_layout()
+        fig.savefig(o, dpi=dpi, bbox_inches=bbox_inches)
+        if not silent:
+            print(f"{ind2}圖像已保存至: {o}")
     
     if not silent:
-        print(f"{ind2}title: {title}")
         print(f"{ind}{'-'*50}")
     
     # 返回圖形對象和統計資訊
