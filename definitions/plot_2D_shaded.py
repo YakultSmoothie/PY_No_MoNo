@@ -21,6 +21,8 @@ import warnings
 from typing import Union, Optional
 from pathlib import Path
 
+import definitions as mydef
+
 #--------------------------------------------
 # save figure
 #--------------------------------------------
@@ -864,6 +866,7 @@ def plot_2D_shaded(array, x=None, y=None,
             - 常用組合：黑色文字配白色描邊，或白色文字配黑色描邊
             例如：user_info_color='white', user_info_stroke_color='black'   
 
+    v1.20.5 2026-02-24 調整 grid_type==3 使用的格式參數為 LongitudeFormatter()
     v1.20.4 2026-01-13 微調自動設定 levels 的邏輯
     v1.20.3 2025-12-31 微調存檔方式 
     v1.20.2 2025-12-30 指定打開互動端 matplotlib.use('TkAgg') 
@@ -1314,6 +1317,7 @@ def plot_2D_shaded(array, x=None, y=None,
 
         if (grid_type == None and type(projection).__name__ == 'PlateCarree') or (grid_type == 3) or (grid_type == 'Lat-Lon'):
             from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
+            from cartopy.mpl.ticker import LongitudeFormatter, LatitudeFormatter
             print(f"{ind2}    grid type: gridlines with labels (for PlateCarree)")   
 
             # 如果沒有指定網格間隔,根據海岸線解析度自動設定            
@@ -1333,6 +1337,8 @@ def plot_2D_shaded(array, x=None, y=None,
             xlocs = np.sort(np.concatenate([-np.arange(grid_int[0], 361, grid_int[0])[::-1], np.arange(0, 361, grid_int[0])]))
             ylocs = np.sort(np.concatenate([-np.arange(grid_int[1], 91, grid_int[1])[::-1], np.arange(0, 91, grid_int[1])]))            
             print(f"{ind2}    grid interval: {grid_int[0]}° (lon) × {grid_int[1]}° (lat)")
+            print(xlocs)
+            print(ylocs)
             
             # 如果使用者手動指定網格線位置,覆寫自動生成的位置
             if grid_xticks is not None:
@@ -1357,8 +1363,14 @@ def plot_2D_shaded(array, x=None, y=None,
             ax.set_yticks(ylocs, crs=transform)
             ax.tick_params(axis='both', which='major', length=6, width=1.5, 
                            labelsize=10, color='black', labelcolor='black')
-            ax.xaxis.set_major_formatter(LONGITUDE_FORMATTER)
-            ax.yaxis.set_major_formatter(LATITUDE_FORMATTER)
+            # 它會自動把 240 轉成 120W，把 300 轉成 60W
+            # for projection = ccrs.PlateCarree(central_longitude=0)
+            # ax.xaxis.set_major_formatter(LONGITUDE_FORMATTER)
+            # ax.yaxis.set_major_formatter(LATITUDE_FORMATTER)
+
+            # for projection = ccrs.PlateCarree(central_longitude=180)
+            ax.xaxis.set_major_formatter(LongitudeFormatter())
+            ax.yaxis.set_major_formatter(LatitudeFormatter())
 
             if gxylim is not None:
                 ax.set_extent(gxylim, crs=transform)
@@ -2032,7 +2044,7 @@ def plot_2D_shaded(array, x=None, y=None,
             for info_dict in user_info:
                 add_user_info_text(ax, 
                                  #dict.get('text'),
-                                 info_dict.get('text'),  # <--- 修正這裡：將 dict 改為 info_dict
+                                 info_dict.get('text'),  
                                  loc=info_dict.get('loc', user_info_loc),
                                  fontsize=info_dict.get('fontsize', user_info_fontsize),
                                  offset=info_dict.get('offset', user_info_offset),
@@ -2077,4 +2089,11 @@ def plot_2D_shaded(array, x=None, y=None,
         print(f"{ind}{'-'*50}")
     
     # 返回圖形對象和統計資訊
-    return fig, ax, stats, XX, YY
+    results = mydef.DualAccessDict({
+        'fig': fig,
+        'ax': ax,
+        'stats': stats,
+        'x_grid': XX,
+        'y_gird': YY
+    })
+    return results
