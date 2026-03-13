@@ -1090,12 +1090,12 @@ def plot_2D_shaded(array, x=None, y=None,
     if ax is None:
         if projection is not None:
             print(f"{ind2}    建立新 figure, 使用投影座標系統({type(projection).__name__})")
-            fig = plt.figure(figsize=figsize)
+            fig = plt.figure(figsize=figsize, dpi=dpi)
             ax = fig.add_subplot(1, 1, 1, projection=projection)
             ax.set_facecolor(background_color)
         else:
             print(f"{ind2}    建立新 figure, 使用一般座標系統")
-            fig, ax = plt.subplots(figsize=figsize)
+            fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
             ax.set_facecolor(background_color)
     else:
         print(f"{ind2}    使用既有的 ax")
@@ -1107,7 +1107,7 @@ def plot_2D_shaded(array, x=None, y=None,
     # 創建圖形
     #background_color = 'gray'
     #if ax is None:        
-    #    fig, ax = plt.subplots(figsize=figsize)
+    #    fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
     #    ax.set_facecolor(background_color)
     #else:
     #    if fig is None:
@@ -1337,8 +1337,8 @@ def plot_2D_shaded(array, x=None, y=None,
             xlocs = np.sort(np.concatenate([-np.arange(grid_int[0], 361, grid_int[0])[::-1], np.arange(0, 361, grid_int[0])]))
             ylocs = np.sort(np.concatenate([-np.arange(grid_int[1], 91, grid_int[1])[::-1], np.arange(0, 91, grid_int[1])]))            
             print(f"{ind2}    grid interval: {grid_int[0]}° (lon) × {grid_int[1]}° (lat)")
-            print(xlocs)
-            print(ylocs)
+            # print(xlocs)
+            # print(ylocs)
             
             # 如果使用者手動指定網格線位置,覆寫自動生成的位置
             if grid_xticks is not None:
@@ -2076,9 +2076,9 @@ def plot_2D_shaded(array, x=None, y=None,
     if show:
         fig.tight_layout()
         fig.show()  # 只在show=True時顯示
-        print('show: True')        
+        print(f'{ind2}show: True')        
     else:
-        print('show: False')
+        print(f'{ind2}show: False')
 
     # 保存圖像    
     if o:        

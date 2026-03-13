@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """
 Custom colormaps for meteorological visualization
+v1.1 - 2026-0310, add a option (cmap_name == 'dbz')
 """
 
 import numpy as np
-from matplotlib.colors import ListedColormap, BoundaryNorm
+from matplotlib.colors import ListedColormap, BoundaryNorm, LinearSegmentedColormap
 
 def _mycolors(colors_name):
     if colors_name == 'rain_colors':
@@ -29,6 +30,25 @@ def _mycolors(colors_name):
             '#DC2DD2',  #200 
             '#FF38FB',  #300 
             '#F6D5FD',  #>300
+        ]
+    elif colors_name == 'dbz_colors':
+        # Anchor colors for CWA radar echo (Radar Echo) 0~65 dBZ
+        colors = [
+            '#FFFFFF',  # 0 dBZ (Cyan)
+            '#00FFFF',  # 0 dBZ (Cyan)
+            '#0099FF',  # 5 dBZ (Light Blue)
+            '#0000FF',  # 10 dBZ (Blue)
+            '#00FF00',  # 15 dBZ (Lime Green)
+            '#00CC00',  # 20 dBZ (Green)
+            '#009900',  # 25 dBZ (Dark Green)
+            '#CCFF00',  # 30 dBZ (Yellow-Green)
+            '#FFFF00',  # 35 dBZ (Yellow)
+            '#FFCC00',  # 40 dBZ (Orange-Yellow)
+            '#FF9900',  # 45 dBZ (Orange)
+            '#FF0000',  # 50 dBZ (Red)
+            '#CC0000',  # 55 dBZ (Dark Red)
+            '#FF00FF',  # 60 dBZ (Magenta)
+            '#9900FF',  # 65 dBZ (Purple)
         ]
     return colors
 
@@ -62,17 +82,26 @@ def mycmap(cmap_name='rain300'):
                             15,  20,  30,  40,  50,
                             70,  90, 110, 130, 150,
                            200, 300])
+        cmap = ListedColormap(colors, name=cmap_name)
         
     elif cmap_name == 'rain900':
         colors = _mycolors('rain_colors')       
         levels = np.array([0, 3, 6, 18, 30, 45, 60, 90, 120, 
                            150, 210, 270, 330, 390, 450, 600, 900])
+        cmap = ListedColormap(colors, name=cmap_name)
+        
+    elif cmap_name == 'dbz':
+        anchor_colors = _mycolors('dbz_colors')
+        # Generate levels from 0 to 65 with 1 dBZ increments (Total 66 boundaries, 65 bins)
+        levels = np.arange(0, 66, 1)
+        interpolated_cmap = LinearSegmentedColormap.from_list('dbz_interp', anchor_colors, N=len(levels)+1)
+        
+        # Extract the interpolated colors to strictly maintain the ListedColormap output format
+        colors = [interpolated_cmap(i) for i in range(interpolated_cmap.N)]
+        cmap = ListedColormap(colors, name=cmap_name)
     
     else:
         raise ValueError(f"Unknown colormap name: {cmap_name}. ")
-    
-    # Create colormap
-    cmap = ListedColormap(colors, name=cmap_name)
     
     # Create normalization
     norm = BoundaryNorm(levels, ncolors=len(colors), extend='both')

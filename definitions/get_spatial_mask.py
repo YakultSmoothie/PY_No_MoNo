@@ -37,23 +37,30 @@ def get_spatial_mask(
     
     Returns
     -------
-    mask : NDArray[np.bool_]
-        2維布林遮罩陣列，形狀為 (n_lat, n_lon)
-        True 表示該點在目標區域內（含向外延伸一格）
-    strict_mask : NDArray[np.bool_]
-        精確符合 extent 數值範圍的遮罩 (不含延伸格)
-    x_slice : slice
-        經度方向的切片索引（對應最後一維）
-    y_slice : slice
-        緯度方向的切片索引（對應倒數第二維）
-    x_indices : NDArray[np.intp]
-        經度方向符合條件的所有索引值
-    y_indices : NDArray[np.intp]
-        緯度方向符合條件的所有索引值
-    new_lons : NDArray[np.floating] or xr.DataArray
-        根據切片範圍提取後的 2 維經度座標陣列
-    new_lats : NDArray[np.floating] or xr.DataArray
-        根據切片範圍提取後的 2 維緯度座標陣列
+    results : DualAccessDict
+        一個自定義字典，可透過鍵值 (Key) 或索引 (Index) 存取以下內容：
+        
+        0. mask : NDArray[np.bool_]
+            2維布林遮罩 (Boolean Mask)，形狀為 (n_lat, n_lon)。
+            True 表示該點在目標矩形切片區域內（含向外延伸一格）。
+        1. x_slice : slice
+            經度方向 (Longitude) 的切片索引，對應陣列最後一維。
+        2. y_slice : slice
+            緯度方向 (Latitude) 的切片索引，對應陣列倒數第二維。
+        3. x_indices : NDArray[np.intp]
+            經度方向符合條件的所有整數索引 (Integer Indices)。
+        4. y_indices : NDArray[np.intp]
+            緯度方向符合條件的所有整數索引 (Integer Indices)。
+        5. lons : NDArray[np.floating] or xr.DataArray
+            根據切片範圍提取後的座標陣列 (Sliced Coordinates)。
+            形狀取決於輸入：若輸入為1維則回傳1維，若為2維則回傳2維。
+        6. lats : NDArray[np.floating] or xr.DataArray
+            根據切片範圍提取後的座標陣列 (Sliced Coordinates)。
+        7. strict_mask : NDArray[np.bool_]
+            精確符合 (Strictly match) extent 數值範圍的布林遮罩，不含延伸格。
+        8. nan_mask : NDArray[np.float64]
+            數值遮罩 (Numerical Mask)，形狀與 mask 相同。
+            區域內為 1.0，區域外為 np.nan，適用於矩陣乘法與繪圖遮蓋。
     
     Raises
     ------
@@ -71,6 +78,8 @@ def get_spatial_mask(
     
     Version History
     ---------------
+    v1.3 2026-03-13 YakultSmoothie and Gemini
+        增加一個mask矩陣使用1與np.nan標記
     v1.2 2026-01-08 YakultSmoothie and Gemini
         支援 extent='all' 參數，用於保留原始完整範圍
         新增回傳 strict_mask，代表精確符合 extent 數值範圍的遮罩（不含向外延伸的一格）
@@ -82,7 +91,7 @@ def get_spatial_mask(
         初始版本,支援1D/2D輸入、單位處理、自動擴充
     """
     
-    print(f"執行 get_spatial_mask, extent={extent} ...")
+    print(f"get_spatial_mask running, extent={extent} ...")
     
     # ========== 步驟1: 處理資料格式與單位 ==========
     def get_raw_data(obj):
@@ -150,8 +159,12 @@ def get_spatial_mask(
     new_lons_obj = lons[x_slice] if lons.ndim == 1 else lons[y_slice, x_slice]
     new_lats_obj = lats[y_slice] if lats.ndim == 1 else lats[y_slice, x_slice]
 
-    # ========== 步驟5: 整理回傳自定義字典 (strict_mask 放在最後) ==========
+    # ========== 步驟5: 1 / np.nan 矩陣  ==========
+    nan_mask = np.where(mask, 1.0, np.nan)
+
+    # ========== 步驟6: 整理回傳自定義字典 (strict_mask 放在最後) ==========
     # 這裡的順序決定了索引 res[0], res[1]... 的內容
+    # 前面有說明輸出變數
     results = DualAccessDict({
         'mask': mask,                   # index 0
         'x_slice': x_slice,             # index 1
@@ -160,10 +173,11 @@ def get_spatial_mask(
         'y_indices': np.arange(y_start, y_end + 1), # index 4
         'lons': new_lons_obj,         # index 5
         'lats': new_lats_obj,         # index 6
-        'strict_mask': strict_mask      # index 7 (放在最後)
+        'strict_mask': strict_mask,   # index 7
+        'nan_mask': nan_mask          # index 8
     })
     
-    print(f"    執行完成!")
+    # print(f"    執行完成!")
     return results
     
 #====================================================================================================
@@ -182,8 +196,8 @@ def main():
     # 測試 A: 透過名稱/索引存取
     res = get_spatial_mask(lons_1d, lats_1d, extent)
     print(f"\n【驗證 1D 切片結果】")
-    print(f"new_lons shape: {res['new_lons'].shape} (預期為 (x_size,))")
-    print(f"new_lats shape: {res['new_lats'].shape} (預期為 (y_size,))")
+    print(f"new_lons shape: {res['lons'].shape} (預期為 (x_size,))")
+    print(f"new_lats shape: {res['lats'].shape} (預期為 (y_size,))")
     
     # 測試 B: 驗證相容舊程式碼的拆解方式 (Unpacking)
     # 這裡我們模擬舊版只抓前 5 個回傳值的寫法
