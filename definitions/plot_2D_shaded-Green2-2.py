@@ -106,12 +106,9 @@ def f2p(
 
     # 根據參數決定是否執行 tight_layout
     if do_tight_layout:
-        try:
-            # 使用 constrained_layout 往往比 tight_layout 在複雜圖層中更穩定
-            target_fig.tight_layout()
-        except UserWarning:
-            print("  [f2p] 提醒：無法套用 tight_layout，保持原始佈局。")
-            
+        target_fig.tight_layout()
+        # print("    已套用 tight_layout 佈局優化。")
+
     # 建立資料夾
     Path(out).parent.mkdir(parents=True, exist_ok=True)
 
@@ -1049,10 +1046,9 @@ def plot_2D_shaded(array, x=None, y=None,
             print(f"{ind2}    Q1, Q2, Q3:   {q1:.6g}, {q2:.6g}, {q3:.6g}")
     else:
         stats['min'] = stats['max'] = stats['mean'] = stats['std'] = stats['q1'] = stats['q2'] = stats['q3'] = np.nan
-        data_min, data_max = 0.0, 1.0
         if not silent:
-            print(f"{ind2}!! 統計摘要: 無有效數據(全部為NaN)，將略過填色並繼續繪圖 !!")
-            # raise ValueError("plot_2D_shaded stop")
+            print(f"{ind2}!! 統計摘要: 無有效數據(全部為NaN) !!")
+            raise ValueError("plot_2D_shaded stop")
     
     # 增加統計NaN值數量
     stats['nan_count'] = nan_count = np.count_nonzero(np.isnan(array))
@@ -1094,12 +1090,12 @@ def plot_2D_shaded(array, x=None, y=None,
     if ax is None:
         if projection is not None:
             print(f"{ind2}    建立新 figure, 使用投影座標系統({type(projection).__name__})")
-            fig = plt.figure(figsize=figsize, dpi=dpi)
+            fig = plt.figure(figsize=figsize)
             ax = fig.add_subplot(1, 1, 1, projection=projection)
             ax.set_facecolor(background_color)
         else:
             print(f"{ind2}    建立新 figure, 使用一般座標系統")
-            fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
+            fig, ax = plt.subplots(figsize=figsize)
             ax.set_facecolor(background_color)
     else:
         print(f"{ind2}    使用既有的 ax")
@@ -1111,7 +1107,7 @@ def plot_2D_shaded(array, x=None, y=None,
     # 創建圖形
     #background_color = 'gray'
     #if ax is None:        
-    #    fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
+    #    fig, ax = plt.subplots(figsize=figsize)
     #    ax.set_facecolor(background_color)
     #else:
     #    if fig is None:

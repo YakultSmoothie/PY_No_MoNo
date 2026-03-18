@@ -57,6 +57,11 @@ from .mycmap import *
 from .geo_to_proj_coords import *
 from .get_spatial_mask import *
 from .calculate_significance_mask_vectorized import *
+from .calculate_anomaly import *
+from .calculate_correlation import *
+from .setup_pressure_axis import *
+from .plot_vortex_track import *
+from .cmd_generate_mp4_from_dir import *
 # from .load_wrfinput_info import *
 
 # 設定別名，

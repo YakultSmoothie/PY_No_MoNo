@@ -1,20 +1,27 @@
 import numpy as np
 import xarray as xr
-from scipy.stats import pearsonr, spearmanr, kendalltau
+import definitions as mydef
+from scipy.stats import pearsonr, spearmanr, kendalltau, linregress
 
 def calculate_correlation(field, index, corr_dim='ensemble', method='pearsonr'):
     """
-    計算空間場 field 與 index 的相關係數，支援 Pearson, Spearman, 與 Kendall 方法。
+    計算空間場 field 與 index 的相關分析與線性回歸分析。
+    支援 Pearson, Spearman, 與 Kendall 相關係數，並包含回歸斜率、截距及標準差。
     
     Parameters:
-        field (xarray.DataArray): 多維空間場資料
-        index (array-like): 與 corr_dim 長度相同的指標序列 (Index sequence)
-        corr_dim (str): 要進行相關分析的目標維度 (default: 'ensemble')
-        method (str): 相關係數類型: 'pearsonr', 'spearmanr', 'kendalltau' (default: 'pearsonr')
+        field (xarray.DataArray): 多維空間場資料 (例如: [ensemble, lat, lon])。
+        index (array-like): 與 corr_dim 長度相同的指標序列 (Index sequence)。
+        corr_dim (str): 要進行相關/回歸分析的目標維度 (default: 'ensemble')。
+        method (str): 相關係數類型: 'pearsonr', 'spearmanr', 'kendalltau' (default: 'pearsonr')。
     
     Returns:
-        cor_map (xarray.DataArray): 相關係數場 (Correlation coefficient map)
-        p_map (xarray.DataArray): p-value 場 (Significance map)
+        results (mydef.DualAccessDict): 包含以下 xarray.DataArray 結果的字典：
+            - 'corr': 相關係數場 (Correlation coefficient map)
+            - 'corr_p_value': 相關係數的 p-value 場
+            - 'slope': 線性回歸斜率場 (Regression slope)
+            - 'intercept': 線性回歸截距場 (Regression intercept)
+            - 'slope_p_value': 回歸斜率的 p-value 檢定
+            - 'std': 環境場在 corr_dim 維度上的標準差 (Standard deviation)
     """
 
     print(f"calculate_correlation running [{method}] over dimension: {corr_dim}...")
@@ -57,9 +64,13 @@ def calculate_correlation(field, index, corr_dim='ensemble', method='pearsonr'):
     data_2d = data_moved.reshape(-1, data_moved.shape[-1])
     print(f"    Flattened 2D shape for calculation: {data_2d.shape}")
 
-    # 初始化儲存結果的 1D 陣列
+    # - 初始化儲存結果的 1D 陣列
     cor_1d = np.full(data_2d.shape[0], np.nan, dtype=float)
     p_1d = np.full(data_2d.shape[0], np.nan, dtype=float)
+    slope_1d = np.full(data_2d.shape[0], np.nan, dtype=float)
+    intercept_1d = np.full(data_2d.shape[0], np.nan, dtype=float)
+    slope_p_val_1d = np.full(data_2d.shape[0], np.nan, dtype=float)
+    data_sd_1d = np.full(data_2d.shape[0], np.nan, dtype=float)
 
     # 5. 對攤平後的每一個空間格點進行迴圈
     for i in range(data_2d.shape[0]):
@@ -71,23 +82,48 @@ def calculate_correlation(field, index, corr_dim='ensemble', method='pearsonr'):
         # 樣本數需足夠才能計算相關係數 (一般建議大於 2)
         if np.sum(mask) > 2:
             # SciPy 的這三個函式回傳格式皆相容 (statistic, pvalue)
-            res = corr_func(data_point[mask], idx_values[mask])
-            
-            # 處理回傳物件（部分版本的 scipy 回傳命名元組，部分為 tuple）
-            cor_1d[i] = res[0]
-            p_1d[i] = res[1]
+            cor_1d[i], p_1d[i] = corr_func(data_point[mask], idx_values[mask])
 
-    # 6. 將 1D 結果重塑回原始的空間形狀
-    cor_reshaped = cor_1d.reshape(spatial_shape)
-    p_reshaped = p_1d.reshape(spatial_shape)
-    print(f"    Reshaped result (spatial only): {cor_reshaped.shape}")
+            # SciPy - 線性回歸
+            slope_1d[i], intercept_1d[i], _, slope_p_val_1d[i], _ = linregress(data_point[mask], idx_values[mask])
+
+            # 環境場 SD
+            data_sd_1d[i] = np.std(data_point[mask])
+            
+    # 6. 將所有 1D 結果重塑回原始的空間形狀
+    # 使用 spatial_shape 將攤平的陣列還原回 (..., lat, lon)
+    cor_reshaped       = cor_1d.reshape(spatial_shape)
+    p_reshaped         = p_1d.reshape(spatial_shape)
+    slope_reshaped     = slope_1d.reshape(spatial_shape)
+    intercept_reshaped = intercept_1d.reshape(spatial_shape)
+    slope_p_reshaped   = slope_p_val_1d.reshape(spatial_shape)
+    sd_reshaped        = data_sd_1d.reshape(spatial_shape)
+
+    print(f"    Calculation completed. Results reshaped to: {cor_reshaped.shape}")
 
     # 7. 準備 xarray 的座標與維度 (排除掉已計算的 corr_dim)
     out_dims = [d for d in field.dims if d != corr_dim]
     out_coords = {d: field.coords[d] for d in out_dims if d in field.coords}
 
-# 建立回傳的 xarray DataArray
+    # 8. 建立回傳的 xarray DataArray 集合
+    # 我們將每個統計結果都包裝成 DataArray，保留原本的空間資訊 (座標)
     cor_map = xr.DataArray(cor_reshaped, dims=out_dims, coords=out_coords, name=f'corr_{method}')
-    p_map = xr.DataArray(p_reshaped, dims=out_dims, coords=out_coords, name='p_value')
+    p_map   = xr.DataArray(p_reshaped, dims=out_dims, coords=out_coords, name='p_value')
+    
+    slope_map     = xr.DataArray(slope_reshaped, dims=out_dims, coords=out_coords, name='regression_slope')
+    intercept_map = xr.DataArray(intercept_reshaped, dims=out_dims, coords=out_coords, name='regression_intercept')
+    slope_p_map   = xr.DataArray(slope_p_reshaped, dims=out_dims, coords=out_coords, name='slope_p_value')
+    
+    sd_map        = xr.DataArray(sd_reshaped, dims=out_dims, coords=out_coords, name='field_standard_deviation')
 
-    return cor_map, p_map
+    # 9. 封裝到 DualAccessDict
+    results = mydef.DualAccessDict({
+        'corr': cor_map,
+        'corr_p_value': p_map,
+        'slope': slope_map,
+        'intercept': intercept_map,
+        'slope_p_value': slope_p_map,
+        'x_std': sd_map
+    })
+
+    return results
