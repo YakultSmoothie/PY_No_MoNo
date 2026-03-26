@@ -13,6 +13,9 @@ Fast 2D array visualization with automatic statistics and multi-format input sup
 
 
 ## 📚 Examples
+### 基本使用
+#### 色階相關
+- Shading - 1 | [ERA5 資料視覺化](https://getupnote.com/share/notes/xf7xZVKNuQNiC02vUdCCJmXIxIL2/019d2833-7289-71e1-a4ce-64099e55c5c1)
 
 ### Example 0: Quick Start - 基本繪圖功能
 - 基礎使用的入門範例, 展示如何在一張圖中組合填色(shading)、等值線(contour)和向量場(vector)
