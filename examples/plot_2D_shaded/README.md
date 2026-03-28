@@ -14,7 +14,7 @@ Fast 2D array visualization with automatic statistics and multi-format input sup
 
 ## 📚 Examples
 ### 基本使用 (UpNote)
-- 基本使用的範例檔案 [pCloud] (https://e.pcloud.link/publink/show?code=kZlsEGZj1nPVJop1nutHIIN77GhNh8ahR5y)
+- 基本使用的範例檔案 [pCloud](https://e.pcloud.link/publink/show?code=kZlsEGZj1nPVJop1nutHIIN77GhNh8ahR5y)
 #### 色階相關
 - Shading - 1: [ERA5 資料視覺化](https://getupnote.com/share/notes/xf7xZVKNuQNiC02vUdCCJmXIxIL2/019d2833-7289-71e1-a4ce-64099e55c5c1)
 - Shading - 2: [cmap](https://getupnote.com/share/notes/xf7xZVKNuQNiC02vUdCCJmXIxIL2/019d2835-6aa0-7026-9e19-adbce25f893f)
