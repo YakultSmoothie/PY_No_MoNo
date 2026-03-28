@@ -14,11 +14,15 @@ Fast 2D array visualization with automatic statistics and multi-format input sup
 
 ## 📚 Examples
 ### 基本使用 (UpNote)
+- 基本使用的範例檔案 [pCloud] (https://e.pcloud.link/publink/show?code=kZlsEGZj1nPVJop1nutHIIN77GhNh8ahR5y)
 #### 色階相關
 - Shading - 1: [ERA5 資料視覺化](https://getupnote.com/share/notes/xf7xZVKNuQNiC02vUdCCJmXIxIL2/019d2833-7289-71e1-a4ce-64099e55c5c1)
 - Shading - 2: [cmap](https://getupnote.com/share/notes/xf7xZVKNuQNiC02vUdCCJmXIxIL2/019d2835-6aa0-7026-9e19-adbce25f893f)
 - Shading - 3: [對數色階](https://getupnote.com/share/notes/xf7xZVKNuQNiC02vUdCCJmXIxIL2/019d2836-0463-763d-ab47-b7a56c9fb3ca)
 - Shading - 4: [自訂不等距色階](https://getupnote.com/share/notes/xf7xZVKNuQNiC02vUdCCJmXIxIL2/019d2836-7876-766d-9168-ce784f9a205a)
+#### 等值線相關
+- Contour - 5: [基礎等值線使用](https://getupnote.com/share/notes/xf7xZVKNuQNiC02vUdCCJmXIxIL2/019d32e4-dd58-775f-8250-c4c3bcf06954)
+- Contour - 6: [進階等值線使用](https://getupnote.com/share/notes/xf7xZVKNuQNiC02vUdCCJmXIxIL2/019d32e3-b262-778e-ade6-085c7452f402)
 
 ### Example 0: Quick Start - 基本繪圖功能
 - 基礎使用的入門範例, 展示如何在一張圖中組合填色(shading)、等值線(contour)和向量場(vector)
