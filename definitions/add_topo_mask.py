@@ -1,9 +1,3 @@
-import numpy as np
-import xarray as xr
-from scipy.ndimage import binary_dilation
-import cartopy.crs as ccrs
-import matplotlib.pyplot as plt
-
 def add_topo_mask(ax, array, x, y, iterations=1, color='gray', zorder=9):
     """
     在指定的 ax 上繪製地形遮罩（由 nan 值產生的擴張區域）。
@@ -19,6 +13,12 @@ def add_topo_mask(ax, array, x, y, iterations=1, color='gray', zorder=9):
 
     v1.0 - 2026.03.16
     """
+    import numpy as np
+    import xarray as xr
+    from scipy.ndimage import binary_dilation
+    import cartopy.crs as ccrs
+    import matplotlib.pyplot as plt
+
     # 1. 建立原始地形遮罩 (nan 變 True, 其餘變 False)
     mask_values = array.isnull().values
 

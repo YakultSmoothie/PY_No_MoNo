@@ -23,7 +23,8 @@ def add_user_info_text(
     stroke_color: str = 'white',
     rotation: float = 0,
     silent: bool = False,
-    indent: int = 0
+    indent: int = 0,
+    zorder: int = 200
 ) -> Optional[matplotlib.text.Text]:
     """   
     參數:
@@ -50,11 +51,13 @@ def add_user_info_text(
         rotation (float): 文字旋轉角度（度，逆時針為正），預設 0
         silent (bool): 是否抑制輸出，預設 False
         indent (int): 終端輸出縮排空格數，預設 0
+        zorder (int): 終端輸出縮排空格數，預設 0
     
     返回:
         matplotlib.text.Text or None: matplotlib text物件（如果有創建的話），否則返回 None
 
     版本歷史:
+        v1.4 2026-03-25 增加zorder參數
         v1.3 2025-11-14 增加rotation參數控制文字角度，增加型別提示
         v1.2 2025-10-15 增加stroke效果參數
         v1.1 2025-09-20 擴充位置選項，增加inner系列位置
@@ -142,7 +145,7 @@ def add_user_info_text(
                       alpha=1.0,
                       rotation=user_info_rotation,
                       rotation_mode='anchor',
-                      zorder=95)
+                      zorder=zorder)
     
     # 根據 stroke_width 決定是否添加描邊效果
     if user_info_stroke_width > 0:

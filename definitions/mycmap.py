@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
 Custom colormaps for meteorological visualization
+v1.2 - 2026-0326, add 'topo' colormap 
 v1.1 - 2026-0310, add a option (cmap_name == 'dbz')
 """
 
@@ -50,6 +51,18 @@ def _mycolors(colors_name):
             '#FF00FF',  # 60 dBZ (Magenta)
             '#9900FF',  # 65 dBZ (Purple)
         ]
+    elif colors_name == 'topo_colors':
+        # Custom topographic colors (18 colors for 17 levels)
+        colors = [
+            '#000045',          # < -1000 (極深海)
+            '#00008B', "#1E3D94", '#1E90FF', # -1000~0 (海洋)
+            '#338033', '#529432', '#70A831', # 0~1000 (陸地低海拔)
+            '#B3C14D', '#D1CC7A', '#E9E4A1', # 1000~3000 (高原)
+            '#CBB982', '#A08357', '#806040', # 3000~4500 (高山)
+            '#6B4F31', '#5A3E25',           # 4500~6000 (深山)
+            '#FFFFFF', '#F0F0F0',           # 6000~8000 (雪線)
+            '#E0E0E0'                        # > 8000 (極高巔峰)
+        ]
     return colors
 
 def mycmap(cmap_name='rain300'):
@@ -59,9 +72,7 @@ def mycmap(cmap_name='rain300'):
     Parameters
     ----------
     cmap_name : str
-        Name of the colormap scheme:
-        - 'rain300': CWA Accumulated Precipitaion
-        - 'rain900': Extended precipitation range 
+        - 'rain300', 'rain900', 'dbz', 'topo'
     
     Returns
     -------
@@ -83,12 +94,14 @@ def mycmap(cmap_name='rain300'):
                             70,  90, 110, 130, 150,
                            200, 300])
         cmap = ListedColormap(colors, name=cmap_name)
+        norm = BoundaryNorm(levels, ncolors=len(colors), extend='both')      # Create normalization
         
     elif cmap_name == 'rain900':
         colors = _mycolors('rain_colors')       
         levels = np.array([0, 3, 6, 18, 30, 45, 60, 90, 120, 
                            150, 210, 270, 330, 390, 450, 600, 900])
         cmap = ListedColormap(colors, name=cmap_name)
+        norm = BoundaryNorm(levels, ncolors=len(colors), extend='both')      # Create normalization
         
     elif cmap_name == 'dbz':
         anchor_colors = _mycolors('dbz_colors')
@@ -99,15 +112,19 @@ def mycmap(cmap_name='rain300'):
         # Extract the interpolated colors to strictly maintain the ListedColormap output format
         colors = [interpolated_cmap(i) for i in range(interpolated_cmap.N)]
         cmap = ListedColormap(colors, name=cmap_name)
+        norm = BoundaryNorm(levels, ncolors=len(colors), extend='both')      # Create normalization
+
+    elif cmap_name == 'topo':
+        # 新增 Topo 邏輯
+        colors = _mycolors('topo_colors')
+        levels = np.array([-2000, -1000, -200, 0, 200, 500, 1000, 2000, 2500, 3000, 3500, 4000, 4500, 5000, 6000, 7000, 8000])
+        cmap = ListedColormap(colors, name=cmap_name)    
+        norm = BoundaryNorm(levels, ncolors=len(colors), extend='both')      # Create normalization
     
     else:
         raise ValueError(f"Unknown colormap name: {cmap_name}. ")
-    
-    # Create normalization
-    norm = BoundaryNorm(levels, ncolors=len(colors), extend='both')
-    
+         
     return cmap, levels, norm
-
 
 def get_cmap_only(cmap_name='rain300'):
     """
@@ -125,7 +142,6 @@ def get_cmap_only(cmap_name='rain300'):
     """
     cmap, _, _ = mycmap(cmap_name)
     return cmap
-
 
 def get_levels_only(cmap_name='rain300'):
     """

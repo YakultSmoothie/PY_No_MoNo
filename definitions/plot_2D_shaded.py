@@ -490,7 +490,7 @@ def plot_2D_shaded(array, x=None, y=None,
                    colorbar_aspect_bai=0.9,     
 
                    # output
-                   figsize=(6, 5), 
+                   figsize=(7, 6), 
                    o=None, 
                    dpi=180, 
                    bbox_inches='tight',   # None, 'tight', Bbox([[0.5, 0.5], [5.5, 4.5]])
@@ -504,12 +504,12 @@ def plot_2D_shaded(array, x=None, y=None,
 
                    # user_info* 可以是單組或列表
                    user_info=None,  # 可以是字串或字串列表
-                   user_info_loc='lower right',  # 位置選項: 'upper/lower' + 'left/right'
-                   user_info_fontsize=6,
+                   user_info_loc='inner lower right',  # 位置選項: 'upper/lower' + 'left/right'
+                   user_info_fontsize=10,
                    user_info_offset=(0.00, 0.00),
-                   user_info_color='black',
-                   user_info_stroke_width=0,        # 修改：預設0表示不描邊
-                   user_info_stroke_color='white',  # 描邊顏色
+                   user_info_color='white',
+                   user_info_stroke_width=2.5,      # 修改：預設0表示不描邊
+                   user_info_stroke_color='black',  # 描邊顏色
 
                    # system_time 在 figure 右下角
                    system_time=False,
@@ -538,6 +538,7 @@ def plot_2D_shaded(array, x=None, y=None,
                    # grid line
                    grid=True, 
                    grid_type=None, 
+                   gt=None,
                    grid_int=None, 
                    grid_xticks = None, grid_yticks = None, 
                    grid_xticks_labels = None, grid_yticks_labels = None,
@@ -561,11 +562,19 @@ def plot_2D_shaded(array, x=None, y=None,
                    vkey_offset=(0.00, 0.00),
                    vkey_labelpos=None,
                    vkey_color=None,        
-                   vzorder = 75,                   
+                   vzorder = 75,   
+
+                   # streamplot
+                   stream_u=None, stream_v=None,
+                   stream_color='blue',
+                   stream_density=2,
+                   stream_linewidth=0.4,
+                   stream_arrowsize=0.5,
+                   stream_zorder=80,                
 
                    # contour
                    cnt=None, clevels=None, cints=None,
-                   ccolor='magenta',
+                   ccolor='deeppink',
                    cwidth=(0.8, 2.0), 
                    ctype=('-', '-'), cntype=('--', '--'), 
                    clab=(False, True),
@@ -585,7 +594,7 @@ def plot_2D_shaded(array, x=None, y=None,
             2D數組，支援多種格式
         x (array-like): 經度座標
         y (array-like): 緯度座標
-        figsize (tuple): 圖形尺寸(寬, 高)，預設(6, 5)
+        figsize (tuple): 圖形尺寸(寬, 高)，預設(7, 6)
         background_color: base color drawed before shaded plotted，預設'gray'
         
     === 圖形樣式參數 ===
@@ -763,13 +772,22 @@ def plot_2D_shaded(array, x=None, y=None,
         vkey_offset (tuple): quiverkey位置偏移量(x_offset, y_offset)用於微調參考箭頭的顯示位置，預設(0.0, 0.0)
             實際位置為(1.05+offset[0], 1.03+offset[1])
         vzorder (int):  預設75
+
+    === 流線場參數 ===
+        stream_u (array-like): 流線場x分量（水平分量）
+        stream_v (array-like): 流線場y分量（垂直分量）
+        stream_color (str): 流線顏色，預設'blue'
+        stream_density (float or tuple): 流線密集度，數值越大越密，預設2
+        stream_linewidth (float): 流線線條寬度，預設0.4
+        stream_arrowsize (float): 流線箭頭大小，預設0.5
+        stream_zorder (int): 流線圖層的繪圖層級，預設76（確保覆蓋在向量圖之上）
                 
     === 等值線參數 ===
         cnt (array-like or list of array-like): 等值線變數
             - 單一2D陣列：繪製一組等值線
             - list of 2D陣列：繪製多組等值線
             例如：[pressure, height, vorticity]        
-        ccolor (str or list of str): 等值線顏色，預設'magenta'
+        ccolor (str or list of str): 等值線顏色，預設'deeppink'
             - 單一顏色：所有等值線使用相同顏色
             - list of str：為每組等值線指定不同顏色
             例如：['magenta', 'blue', 'green']        
@@ -844,7 +862,7 @@ def plot_2D_shaded(array, x=None, y=None,
             - str: 單行文字，例如："Experiment A"
             - list/tuple: 多行文字，每個元素為一行
             例如：["Model: WRF", "Resolution: 3km", "Date: 2024-10-22"]            
-        user_info_loc (str): 使用者資訊的顯示位置，預設'upper right'
+        user_info_loc (str): 使用者資訊的顯示位置，預設'inner lower right'
             - 'upper right': 面板區域右上角
             - 'upper left': 面板區域左上角
             - 'lower right': 面板區域右下角
@@ -858,17 +876,19 @@ def plot_2D_shaded(array, x=None, y=None,
             - 用於微調使用者資訊的顯示位置，正值向右/向上移動，負值向左/向下移動
             例如：(0.05, -0.05)表示向右移動5%，向下移動5%
             例如：(-0.10, 0.00)表示向左移動10%，垂直位置不變      
-        user_info_fontsize (int): 使用者資訊的字體大小，預設6
-        user_info_color (str): 使用者資訊的文字顏色，預設'black'
-        user_info_stroke_width (float): 描邊寬度，預設0（不描邊）
+        user_info_fontsize (int): 使用者資訊的字體大小，預設10
+        user_info_color (str): 使用者資訊的文字顏色，預設'white'
+        user_info_stroke_width (float): 描邊寬度，預設2.5
             - 0 或負值: 不使用描邊效果
             - >0: 啟用描邊效果，數值越大描邊越粗
             例如：user_info_stroke_width=2
-        user_info_stroke_color (str): 描邊顏色，預設'white'
+        user_info_stroke_color (str): 描邊顏色，預設'black'
             - 僅在 user_info_stroke_width > 0 時生效
             - 常用組合：黑色文字配白色描邊，或白色文字配黑色描邊
             例如：user_info_color='white', user_info_stroke_color='black'   
 
+    v1.21 2026-03-29 新增流線場 (streamplot) 繪製功能
+    v1.20.6 2026-03-28 微調預設參數
     v1.20.5 2026-02-24 調整 grid_type==3 使用的格式參數為 LongitudeFormatter()
     v1.20.4 2026-01-13 微調自動設定 levels 的邏輯
     v1.20.3 2025-12-31 微調存檔方式 
@@ -1059,6 +1079,8 @@ def plot_2D_shaded(array, x=None, y=None,
     stats['nan_percent'] = nan_percent = nan_count / (rows * cols) * 100
     stats['valid_count'] = valid_count = rows * cols - nan_count
     stats['valid_percent'] = valid_percent = 100 - nan_percent
+
+    grid_type = grid_type or gt
 
     if (grid_type == 3) or (grid_type == 'Lat-Lon'):
         if projection is None:
@@ -1720,6 +1742,69 @@ def plot_2D_shaded(array, x=None, y=None,
     else:        
         print(f"{ind2}    vector disabled")
 
+    # ============ 流線場繪製 ============
+    if not silent:
+        print(f"{ind2}流線場繪製 (v1.21.1 修正版):")
+        
+    if stream_u is not None and stream_v is not None:
+        # 1. 提取數據 (保持原有容錯邏輯)
+        def _get_raw(data):
+            if hasattr(data, 'data') and hasattr(data.data, 'magnitude'): return data.data.magnitude
+            if hasattr(data, 'magnitude'): return data.magnitude
+            if hasattr(data, 'values'): return data.values
+            return np.array(data)
+
+        su_raw = _get_raw(stream_u)
+        sv_raw = _get_raw(stream_v)
+        
+        # 2. 準備 streamplot 專用的 1D 座標 (取網格的第一列/第一欄)
+        # streamplot 偏好 1D 遞增向量
+        strm_x = XX[0, :] 
+        strm_y = YY[:, 0]
+        strm_u_plot = su_raw
+        strm_v_plot = sv_raw
+
+        # 3. 關鍵修正：檢查 y 是否嚴格遞增 (解決 ValueError)
+        if strm_y[0] > strm_y[-1]:
+            if not silent: print(f"{ind2}    偵測到 y 軸遞減，執行自動翻轉以符合 streamplot 規範")
+            strm_y = np.flip(strm_y)
+            strm_u_plot = np.flipud(strm_u_plot)
+            strm_v_plot = np.flipud(strm_v_plot)
+            
+        # 同理檢查 x 軸
+        if strm_x[0] > strm_x[-1]:
+            if not silent: print(f"{ind2}    偵測到 x 軸遞減，執行自動翻轉")
+            strm_x = np.flip(strm_x)
+            strm_u_plot = np.fliplr(strm_u_plot)
+            strm_v_plot = np.fliplr(strm_v_plot)
+        
+        if not silent:
+            print(f"{ind2}    color: {stream_color}, density: {stream_density}")
+            print(f"{ind2}    linewidth: {stream_linewidth}, arrowsize: {stream_arrowsize}, zorder: {stream_zorder}")
+        
+        # 執行繪製 (套用現有的 XX, YY 網格座標與投影 transform)
+        if transform is not None:
+            strm = ax.streamplot(strm_x, strm_y, strm_u_plot, strm_v_plot,
+                                 color=stream_color,
+                                 density=stream_density,
+                                 linewidth=stream_linewidth,
+                                 arrowsize=stream_arrowsize,
+                                 transform=transform,
+                                 zorder=stream_zorder)
+        else:
+            strm = ax.streamplot(strm_x, strm_y, strm_u_plot, strm_v_plot,
+                                 color=stream_color,
+                                 density=stream_density,
+                                 linewidth=stream_linewidth,
+                                 arrowsize=stream_arrowsize,
+                                 zorder=stream_zorder)
+        
+        # 將流線圖物件存入統計字典回傳
+        stats['streamplot'] = strm
+    else:
+        if not silent:
+            print(f"{ind2}    streamplot disabled")
+
     # ============ 等值線繪製 ============
     if not silent:
         print(f"{ind2}等值線繪製:")
@@ -2098,6 +2183,6 @@ def plot_2D_shaded(array, x=None, y=None,
         'ax': ax,
         'stats': stats,
         'x_grid': XX,
-        'y_gird': YY
+        'y_grid': YY
     })
     return results

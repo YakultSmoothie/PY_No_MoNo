@@ -2,7 +2,7 @@
 # ====================================================================================================
 #  前置def
 # ====================================================================================================
-# 計算剖面線上每個點到起點的距離（公里）
+# 大球距離公式（公里）
 def haversine_distance(lat1, lon1, lat2, lon2):
     """計算地球大圓距離（km）"""
     import numpy as np
@@ -120,9 +120,9 @@ def custom_cross_section(data, start, end, lons, lats, steps=101, method='linear
     steps : int 插值點數
     method : str  插值方法 (interp_type)。
         SciPy methods: 'linear', 'nearest', 'cubic', 'rbf'
-        MetPy methods: 'natural_neighbor', 'barnes', 'cressman'
-        webpage of metpy.interpolate.interpolate_to_points :
-        https://unidata.github.io/MetPy/latest/api/generated/metpy.interpolate.interpolate_to_points.html#metpy.interpolate.interpolate_to_points
+        [not yet] MetPy methods: 'natural_neighbor', 'barnes', 'cressman'
+        [not yet] webpage of metpy.interpolate.interpolate_to_points :
+        [not yet] https://unidata.github.io/MetPy/latest/api/generated/metpy.interpolate.interpolate_to_points.html#metpy.interpolate.interpolate_to_points
     buffer_km : float 剖面兩側的緩衝區距離（公里），用於預先篩選資料點，預設為不設定遮罩
     orientation_method : str 指向計算方式 ('spherical', 'cartesian')
         'cartesian' : 使用笛卡爾座標，直接計算與經緯度線的交角（平面近似）
@@ -232,22 +232,29 @@ def custom_cross_section(data, start, end, lons, lats, steps=101, method='linear
     # print(f"    計算網格點到剖面線的距離（使用 Haversine 公式）...")
     grid_points = np.column_stack([lats_grid.ravel(), lons_grid.ravel()])
     path_points = np.column_stack([lats_path, lons_path])
-    
-    # 計算所有網格點到所有剖面點的距離矩陣
-    # 注意：這會產生一個 (n_path × n_grid) 的矩陣
-    distances_matrix = haversine_distance_vectorized(
-        grid_points[:, 0],  # 所有網格點的緯度
-        grid_points[:, 1],  # 所有網格點的經度
-        path_points[:, 0],  # 所有剖面點的緯度
-        path_points[:, 1]   # 所有剖面點的經度
-    )
-    
-    # 對每個網格點，找出到剖面線的最短距離
-    distances_to_path = distances_matrix.min(axis=0)
-    
-    spatial_mask = distances_to_path <= buffer_km
-    print(f"    剖面緩衝區: ±{buffer_km} km; 保留 {spatial_mask.sum()}/{len(spatial_mask)} 個網格點 ({100*spatial_mask.sum()/len(spatial_mask):.1f}%)")
-    
+
+    # ==========================================
+    # 核心修改：判斷 buffer_km 是否為無限大 (1E99)
+    # ==========================================
+    if buffer_km >= 1e5:
+        # 直接產生全為 True 的布林陣列，保留所有網格點
+        spatial_mask = np.ones(len(grid_points), dtype=bool)
+        print(f"    剖面緩衝區: 未設定 (buffer_km={buffer_km})，略過距離計算。")
+    else:
+        print(f"    計算網格點到剖面線的距離...")
+        # 計算所有網格點到所有剖面點的距離矩陣
+        distances_matrix = haversine_distance_vectorized(
+            grid_points[:, 0],  
+            grid_points[:, 1],  
+            path_points[:, 0],  
+            path_points[:, 1]   
+        )
+        
+        # 對每個網格點，找出到剖面線的最短距離
+        distances_to_path = distances_matrix.min(axis=0)
+        spatial_mask = distances_to_path <= buffer_km
+        print(f"    剖面緩衝區: ±{buffer_km} km; 保留 {spatial_mask.sum()}/{len(spatial_mask)} 個網格點 ({100*spatial_mask.sum()/len(spatial_mask):.1f}%)")
+       
     # 重塑 data 使最後兩維是空間維度
     original_dims = list(data.dims)
     original_shape = data.shape
