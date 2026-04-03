@@ -53,17 +53,21 @@ from .def_show_array_info import *
 from .plot_2D_shaded import *
 from .draw_ol import *
 from .add_user_info_text import *
+from .add_cross_section_milestones import *
 from .mycmap import *
 from .geo_to_proj_coords import *
 from .get_spatial_mask import *
 from .calculate_significance_mask_vectorized import *
 from .calculate_anomaly import *
 from .calculate_correlation import *
+from .calc_cross_section_winds import *
 from .setup_pressure_axis import *
 from .plot_vortex_track import *
 from .cmd_generate_mp4_from_dir import *
 from .add_topo_mask import *
-# from .load_wrfinput_info import *
+from .load_wrfinput_info import *
+from .def_figs_to_mp4 import *
+from .DualAccessDict import *
 
 # 設定別名，
 # 這些別名也會存在於 definitions 命名空間中，但不在 __all__ 裡，

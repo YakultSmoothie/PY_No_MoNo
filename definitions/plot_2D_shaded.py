@@ -20,6 +20,7 @@ import matplotlib.patheffects as patheffects
 import warnings
 from typing import Union, Optional
 from pathlib import Path
+from scipy.interpolate import RegularGridInterpolator
 
 import definitions as mydef
 
@@ -91,45 +92,56 @@ def f2p(
     bbox_inches: str = 'tight'
 ):
     """
-    plt.figure to .png
-    保存圖像，並可選擇是否執行 tight_layout。
+    plt.figure to .png (Figure to Paper)
+    將圖表保存為高品質圖片，並自動處理非法檔名。
     """
-
-    # 如果呼叫時沒傳入 pltfigure，則自動抓取當前活動中的 fig
+    
+    from pathlib import Path
+    import re
+    import matplotlib.pyplot as plt
+    
     target_fig = figure if figure is not None else plt.gcf()
 
-    print("[f2p] Saving file(s) ...")
-
     if not out:
-        print("警告：未指定 output_path，取消存檔。")
+        print("[f2p] 錯誤：未指定輸出路徑。")
         return
 
-    # 根據參數決定是否執行 tight_layout
+    # --- 新增：處理非法字元 (Sanitize filename) ---
+    # 將冒號替換為連字號，將空格替換為底線，避免路徑解析錯誤
+    out_path = Path(out)
+    sanitized_name = re.sub(r'[:\s]+', '_', out_path.name)
+    out = out_path.parent / sanitized_name
+
+    print(f"[f2p] Saving figure to: {out}")
+
     if do_tight_layout:
         try:
-            # 使用 constrained_layout 往往比 tight_layout 在複雜圖層中更穩定
+            # 針對氣象大數據繪圖，建議優先嘗試 constrained_layout
             target_fig.tight_layout()
-        except UserWarning:
-            print("  [f2p] 提醒：無法套用 tight_layout，保持原始佈局。")
+        except Exception as e:
+            print(f"    [f2p] Warning: tight_layout failed: {e}")
             
-    # 建立資料夾
-    Path(out).parent.mkdir(parents=True, exist_ok=True)
+    # 建立目錄
+    out.parent.mkdir(parents=True, exist_ok=True)
 
     # 存檔
-    target_fig.savefig(out, dpi=dpi, bbox_inches=bbox_inches)
-    print(f"    figure saved: {out}")
+    try:
+        target_fig.savefig(str(out), dpi=dpi, bbox_inches=bbox_inches)
+        # print(f"    [f2p] Success: {out.name}")
+    except Exception as e:
+        print(f"    [f2p] Save failed! Error: {e}")
 
 #--------------------------------------------
 # UV_grid to UV_lonlat
 #--------------------------------------------
 def rotate_vector(ua, va, cosalpha, sinalpha, component="u"):
     """
-    根據提供的 cosalpha 和 sinalpha 旋轉向量 (ua, va)。
+    根據wrfpy提取的 cosalpha 和 sinalpha 旋轉向量 (ua, va) -> (umet, vmet)。
     處理wrf資料的話，可以使用 wrf.getvar 從 wrfoutput 中提取 cosalpha 與 sinalpha.
     
     公式:
-        U_rot = ua * cosalpha - va * sinalpha
-        V_rot = ua * sinalpha + va * cosalpha
+        umet = ua * cosalpha - va * sinalpha
+        vmet = ua * sinalpha + va * cosalpha
     
     參數:
         ua (array-like): 原始向量的 U 分量。可以是 2D (lat, lon) 或 3D (time, lat, lon) 或更多 (..., lat, lon)。
@@ -137,8 +149,8 @@ def rotate_vector(ua, va, cosalpha, sinalpha, component="u"):
         cosalpha (array-like): 旋轉角度的餘弦值。通常為 2D (lat, lon)。
         sinalpha (array-like): 旋轉角度的正弦值。通常為 2D (lat, lon)。
         component (str): 指定要返回的分量，"u" 或 "v"。
-                         "u" 對應公式中的 U_rot (例如 East)
-                         "v" 對應公式中的 V_rot (例如 North)
+                         "u" 對應公式中的 umet (例如 East)
+                         "v" 對應公式中的 vmet (例如 North)
     
     Broadcasting 說明:
         此函式支援 NumPy Broadcasting 機制。
@@ -486,8 +498,8 @@ def plot_2D_shaded(array, x=None, y=None,
                    colorbar_label=None,                 
                    colorbar_offset=0,           
                    colorbar_fraction_offset=0,     
-                   colorbar_shrink_bai=0.8,       
-                   colorbar_aspect_bai=0.9,     
+                   colorbar_shrink_bai=0.6,       
+                   colorbar_aspect_bai=0.5,     
 
                    # output
                    figsize=(7, 6), 
@@ -555,7 +567,7 @@ def plot_2D_shaded(array, x=None, y=None,
                    vx=None, vy=None, 
                    vx_bai=None, vy_bai=None, 
                    vc1='black', vc2='white', 
-                   vwidth=6, vlinewidth=0.4, 
+                   vwidth=4, vlinewidth=0.4, 
                    vscale=None, 
                    vskip=None,
                    vref=None, vunit=None, 
@@ -568,8 +580,8 @@ def plot_2D_shaded(array, x=None, y=None,
                    stream_u=None, stream_v=None,
                    stream_color='blue',
                    stream_density=2,
-                   stream_linewidth=0.4,
-                   stream_arrowsize=0.5,
+                   stream_linewidth=0.5,
+                   stream_arrowsize=0.8,
                    stream_zorder=80,                
 
                    # contour
@@ -618,10 +630,10 @@ def plot_2D_shaded(array, x=None, y=None,
             - 自動設定對應的 orientation (vertical/horizontal)
         colorbar_offset (pad): colorbar 與 Axes 之間的間距（預設：0）
            - 正值推離圖表，負值拉近圖表
-        colorbar_shrink_bai: colorbar 長度的縮放倍率（預設：0.8）
+        colorbar_shrink_bai: colorbar 長度的縮放倍率（預設：0.6）
            - >1 加長，<1 縮短
            - 影響 colorbar 沿著主軸方向（vertical時為高度，horizontal時為寬度）的長度
-        colorbar_aspect_bai: colorbar 寬度（粗細）的調整倍率（預設：0.8）           
+        colorbar_aspect_bai: colorbar 寬度（粗細）的調整倍率（預設：0.5）           
            - >1 變寬（變粗），<1 變細           
         colorbar_fraction_offset: 預留給 colorbar 的空間比例調整（預設：0）
            - 當空間不足時，shrink 與 aspect 的調整效果會受限，colorbar 可能出現非預期變形
@@ -758,8 +770,8 @@ def plot_2D_shaded(array, x=None, y=None,
             - str: 手動指定顏色，例如：'red', 'blue', '#FF0000'        
         vc1 (str): 向量主體顏色，預設'black'
         vc2 (str): 向量邊界顏色，預設'lightblue'        
-        vwidth (float): 向量寬度，預設6
-            注意：程式內自動除以1000，實際寬度為0.006        
+        vwidth (float): 向量寬度，預設4
+            注意：程式內自動除以1000，實際寬度為0.004        
         vlinewidth (float): 向量邊界線寬，預設0.4        
         vscale (float): 向量縮放比例，若為None則自動設為max_wind_speed*4
             數值越大，箭頭越短        
@@ -778,8 +790,8 @@ def plot_2D_shaded(array, x=None, y=None,
         stream_v (array-like): 流線場y分量（垂直分量）
         stream_color (str): 流線顏色，預設'blue'
         stream_density (float or tuple): 流線密集度，數值越大越密，預設2
-        stream_linewidth (float): 流線線條寬度，預設0.4
-        stream_arrowsize (float): 流線箭頭大小，預設0.5
+        stream_linewidth (float): 流線線條寬度，預設0.5
+        stream_arrowsize (float): 流線箭頭大小，預設0.8
         stream_zorder (int): 流線圖層的繪圖層級，預設76（確保覆蓋在向量圖之上）
                 
     === 等值線參數 ===
@@ -887,6 +899,10 @@ def plot_2D_shaded(array, x=None, y=None,
             - 常用組合：黑色文字配白色描邊，或白色文字配黑色描邊
             例如：user_info_color='white', user_info_stroke_color='black'   
 
+    v1.21.1 2026-04-02 修改clevels邏輯 微調預設參數(
+        colorbar_shrink_bai=0.6, 
+        colorbar_aspect_bai=0.5,
+        vwidth=4)
     v1.21 2026-03-29 新增流線場 (streamplot) 繪製功能
     v1.20.6 2026-03-28 微調預設參數
     v1.20.5 2026-02-24 調整 grid_type==3 使用的格式參數為 LongitudeFormatter()
@@ -1216,17 +1232,17 @@ def plot_2D_shaded(array, x=None, y=None,
         
         # 1. 決定orientation和pad0        
         if colorbar_location in ['right', 'left']:
-            pad0 = 0.04
+            pad0 = 0.02
             colorbar_orientation = 'vertical'
             colorbar_fraction_base = 0.10
             colorbar_shrink_base = 1.0
             aspect_base = 15  # 基礎aspect值                
         else:  # 'top' or 'bottom'
             colorbar_orientation = 'horizontal'
-            pad0 = 0.15
-            colorbar_fraction_base = 0.15
-            colorbar_shrink_base = 1.0
-            aspect_base = 20  # 基礎aspect值                
+            pad0 = 0.12
+            colorbar_fraction_base = 0.10
+            colorbar_shrink_base = 1.5
+            aspect_base = 30  # 基礎aspect值                
         if not silent:
             print(f"{ind2}        orientation: {colorbar_orientation} (location={colorbar_location})")   
         
@@ -1239,7 +1255,7 @@ def plot_2D_shaded(array, x=None, y=None,
         if not silent:                        
             print(f"{ind2}        pad: {colorbar_offset} (offset) + {pad0} (base) = {pad_actual} (final)")
             print(f"{ind2}        fraction: {colorbar_fraction_offset} (offset) + {colorbar_fraction_base} (base) = {colorbar_fraction} (final)")        
-            print(f"{ind2}        shrink: {colorbar_shrink_bai} (bai) * {colorbar_shrink_bai} (base) = {colorbar_shrink} (final)")
+            print(f"{ind2}        shrink: {colorbar_shrink_bai} (bai) * {colorbar_shrink_base} (base) = {colorbar_shrink} (final)")
             print(f"{ind2}        aspect: 1/{colorbar_aspect_bai:.2f} (1/bai) * {colorbar_shrink/colorbar_shrink_base} (shrink/base) = {colorbar_aspect:.2f} (final)")
                     
         # 4. 繪製colorbar
@@ -1260,7 +1276,7 @@ def plot_2D_shaded(array, x=None, y=None,
         cbar.ax.set_zorder(50)
         
         #將刻度線移到色條內側 
-        cbar.ax.tick_params(direction='in', length=8, width=1, which='major', color='#000000')
+        cbar.ax.tick_params(direction='in', length=6, width=1, which='major', color='#000000')
         #cbar.ax.tick_params(direction='in', length=8, width=0.5, which='major', color='#FFFFFF')
         #cbar.ax.tick_params(labelsize=10)
 
@@ -1687,7 +1703,7 @@ def plot_2D_shaded(array, x=None, y=None,
         if (colorbar_location == 'bottom'):
             qk_x_base = 0.95
             qk_y_base = 1.05
-            if vkey_labelpos is None: vkey_labelpos = 'N'
+            if vkey_labelpos is None: vkey_labelpos = 'W'
         elif  (colorbar_location == 'right'):
             qk_x_base = 0.93
             qk_y_base = 1.03
@@ -1744,9 +1760,10 @@ def plot_2D_shaded(array, x=None, y=None,
 
     # ============ 流線場繪製 ============
     if not silent:
-        print(f"{ind2}流線場繪製 (v1.21.1 修正版):")
+        print(f"{ind2}流線場繪製:")
         
     if stream_u is not None and stream_v is not None:
+        
         # 1. 提取數據 (保持原有容錯邏輯)
         def _get_raw(data):
             if hasattr(data, 'data') and hasattr(data.data, 'magnitude'): return data.data.magnitude
@@ -1764,20 +1781,45 @@ def plot_2D_shaded(array, x=None, y=None,
         strm_u_plot = su_raw
         strm_v_plot = sv_raw
 
-        # 3. 關鍵修正：檢查 y 是否嚴格遞增 (解決 ValueError)
-        if strm_y[0] > strm_y[-1]:
-            if not silent: print(f"{ind2}    偵測到 y 軸遞減，執行自動翻轉以符合 streamplot 規範")
-            strm_y = np.flip(strm_y)
-            strm_u_plot = np.flipud(strm_u_plot)
-            strm_v_plot = np.flipud(strm_v_plot)
+        if (grid_type == None) or (grid_type == 1):
+            # 3. 修正方向 (確保遞增)
+            if strm_y[0] > strm_y[-1]:
+                strm_y = np.flip(strm_y)            
+                strm_u_plot = np.flipud(strm_u_plot)
+                strm_v_plot = np.flipud(strm_v_plot) 
+            if strm_x[0] > strm_x[-1]:
+                strm_x = np.flip(strm_x)            
+                strm_u_plot = np.fliplr(strm_u_plot) 
+                strm_v_plot = np.fliplr(strm_v_plot)
+
+            # 4. 關鍵修正：處理「非等距網格」 (ValueError: 'y' values must be equally spaced)
+            dx = np.diff(strm_x)
+            dy = np.diff(strm_y)
             
-        # 同理檢查 x 軸
-        if strm_x[0] > strm_x[-1]:
-            if not silent: print(f"{ind2}    偵測到 x 軸遞減，執行自動翻轉")
-            strm_x = np.flip(strm_x)
-            strm_u_plot = np.fliplr(strm_u_plot)
-            strm_v_plot = np.fliplr(strm_v_plot)
-        
+            if not (np.allclose(dx, dx[0]) and np.allclose(dy, dy[0])):
+                if not silent:
+                    print(f"{ind2}    {'!'*40}")
+                    print(f"{ind2}    [警告] Matplotlib streamplot 原生不支援非等距網格 (如氣壓座標 P-level)。")
+                    print(f"{ind2}    正在執行自動重採樣 (Resampling) 以產生等距場進行繪製...")
+                    print(f"{ind2}    {'!'*40}")
+
+                # 建立等距的線性網格
+                new_x = np.linspace(strm_x[0], strm_x[-1], len(strm_x))
+                new_y = np.linspace(strm_y[0], strm_y[-1], len(strm_y))
+
+                # 使用 RegularGridInterpolator 重新採樣
+                interp_u = RegularGridInterpolator((strm_y, strm_x), strm_u_plot)
+                interp_v = RegularGridInterpolator((strm_y, strm_x), strm_v_plot)
+
+                # 產生採樣點座標
+                YY_mesh, XX_mesh = np.meshgrid(new_y, new_x, indexing='ij')
+                pts = np.vstack([YY_mesh.ravel(), XX_mesh.ravel()]).T
+
+                # 更新繪圖資料與座標
+                strm_u_plot = interp_u(pts).reshape(len(new_y), len(new_x))
+                strm_v_plot = interp_v(pts).reshape(len(new_y), len(new_x))
+                strm_x, strm_y = new_x, new_y
+
         if not silent:
             print(f"{ind2}    color: {stream_color}, density: {stream_density}")
             print(f"{ind2}    linewidth: {stream_linewidth}, arrowsize: {stream_arrowsize}, zorder: {stream_zorder}")
@@ -1877,7 +1919,13 @@ def plot_2D_shaded(array, x=None, y=None,
             cnt_current = cnt_list[i_cnt]
             ccolor_current = ccolor_list[i_cnt]
             clevels_current = clevels_list[i_cnt]
-            if clevels_current == (None, None): clevels_current = None
+            try:
+                if clevels_current == (None, None):
+                    clevels_current = None
+            except ValueError:
+                # 如果是陣列比較引發的錯誤，說明它肯定不是 (None, None)，保持原樣即可
+                pass           
+            # if clevels_current == (None, None): clevels_current = None
             cints_current = cints_list[i_cnt]
             if cints_current == (None, None): cints_current = None
             cwidth_current = cwidth_list[i_cnt]
