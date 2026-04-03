@@ -15,6 +15,7 @@ Fast 2D array visualization with automatic statistics and multi-format input sup
 ## 📚 Examples
 ### 基本使用 (UpNote)
 - 基本使用的範例input與code們: [pCloud](https://e.pcloud.link/publink/show?code=kZlsEGZj1nPVJop1nutHIIN77GhNh8ahR5y)
+
 #### 色階相關
 - Shading - 1: [ERA5 資料視覺化](https://getupnote.com/share/notes/xf7xZVKNuQNiC02vUdCCJmXIxIL2/019d2833-7289-71e1-a4ce-64099e55c5c1)
 - Shading - 2: [cmap](https://getupnote.com/share/notes/xf7xZVKNuQNiC02vUdCCJmXIxIL2/019d2835-6aa0-7026-9e19-adbce25f893f)
@@ -23,6 +24,12 @@ Fast 2D array visualization with automatic statistics and multi-format input sup
 #### 等值線相關
 - Contour - 5: [基礎等值線使用](https://getupnote.com/share/notes/xf7xZVKNuQNiC02vUdCCJmXIxIL2/019d32e4-dd58-775f-8250-c4c3bcf06954)
 - Contour - 6: [進階等值線使用](https://getupnote.com/share/notes/xf7xZVKNuQNiC02vUdCCJmXIxIL2/019d32e3-b262-778e-ade6-085c7452f402)
+- Contour - 7: [多層環境場](https://getupnote.com/share/notes/xf7xZVKNuQNiC02vUdCCJmXIxIL2/019d513a-36c5-747d-8f7a-04b7c455a3e1)
+#### 向量相關
+- Vector - 8: [向量基本使用](https://getupnote.com/share/notes/xf7xZVKNuQNiC02vUdCCJmXIxIL2/019d5135-062e-710f-9c4f-af6a1782b5f1)
+- Vector - 9: [雙向量](https://getupnote.com/share/notes/xf7xZVKNuQNiC02vUdCCJmXIxIL2/019d5135-37a5-72eb-a8af-870a8f42fa58)
+#### 剖面相關
+- Cross Section - 10: [垂直剖面](https://getupnote.com/share/notes/xf7xZVKNuQNiC02vUdCCJmXIxIL2/019d5134-a201-76f6-9bbb-7999e6c24984)
 
 
 ----- ----- -----
