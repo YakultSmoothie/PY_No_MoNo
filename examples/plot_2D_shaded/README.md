@@ -83,6 +83,12 @@ Fast 2D array visualization with automatic statistics and multi-format input sup
 - [`add_user_info_text()`](https://github.com/YakultSmoothie/PY\_No\_MoNo/blob/main/definitions/add\_user\_info\_text.py) - Add annotations to plots
 - [`draw_ol()`](https://github.com/YakultSmoothie/PY_No_MoNo/blob/main/definitions/draw_ol.py) - Add a thick outline box to plots
 - [`figs_to_mp4()`](https://github.com/YakultSmoothie/PY\_No\_MoNo/blob/main/definitions/def\_figs\_to\_mp4.py) - Create animations from figures
+- [f2p()] - Fig to PNG
+- [setup_pressure_axis()] - Log-pressure Y-axis formatting for atmospheric vertical profiles
+- [add_cross_section_milestones()] - Map distance markers for spatial-cross section alignment
+- [custom_cross_section()] - Great-circle interpolation for 3D data to 2D sections
+- [calc_cross_section_winds()] - Cross-section wind decomposition (Parallel/Normal components)
+- [mycmap()] - Custom colormap module
 
 
 
