@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 """
 Custom colormaps for meteorological visualization
+v1.3 - 2026-0429, add 'colorbar_ticks'  
 v1.2 - 2026-0326, add 'topo' colormap 
 v1.1 - 2026-0310, add a option (cmap_name == 'dbz')
 """
 
 import numpy as np
 from matplotlib.colors import ListedColormap, BoundaryNorm, LinearSegmentedColormap
+from definitions.DualAccessDict import DualAccessDict
+
 
 def _mycolors(colors_name):
     if colors_name == 'rain_colors':
@@ -82,6 +85,8 @@ def mycmap(cmap_name='rain300'):
         Boundary levels for the colormap
     norm : BoundaryNorm
         Normalization object for mapping data to colors
+    colorbar_ticks : array
+        levels for the color bar
     
     """
     
@@ -95,14 +100,16 @@ def mycmap(cmap_name='rain300'):
                            200, 300])
         cmap = ListedColormap(colors, name=cmap_name)
         norm = BoundaryNorm(levels, ncolors=len(colors), extend='both')      # Create normalization
-        
+        colorbar_ticks = levels
+
     elif cmap_name == 'rain900':
         colors = _mycolors('rain_colors')       
         levels = np.array([0, 3, 6, 18, 30, 45, 60, 90, 120, 
                            150, 210, 270, 330, 390, 450, 600, 900])
         cmap = ListedColormap(colors, name=cmap_name)
         norm = BoundaryNorm(levels, ncolors=len(colors), extend='both')      # Create normalization
-        
+        colorbar_ticks = levels
+
     elif cmap_name == 'dbz':
         anchor_colors = _mycolors('dbz_colors')
         # Generate levels from 0 to 65 with 1 dBZ increments (Total 66 boundaries, 65 bins)
@@ -113,18 +120,26 @@ def mycmap(cmap_name='rain300'):
         colors = [interpolated_cmap(i) for i in range(interpolated_cmap.N)]
         cmap = ListedColormap(colors, name=cmap_name)
         norm = BoundaryNorm(levels, ncolors=len(colors), extend='both')      # Create normalization
-
+        colorbar_ticks = levels
+        
     elif cmap_name == 'topo':
         # 新增 Topo 邏輯
         colors = _mycolors('topo_colors')
         levels = np.array([-2000, -1000, -200, 0, 200, 500, 1000, 2000, 2500, 3000, 3500, 4000, 4500, 5000, 6000, 7000, 8000])
         cmap = ListedColormap(colors, name=cmap_name)    
         norm = BoundaryNorm(levels, ncolors=len(colors), extend='both')      # Create normalization
+        colorbar_ticks = levels
     
     else:
         raise ValueError(f"Unknown colormap name: {cmap_name}. ")
          
-    return cmap, levels, norm
+    return DualAccessDict({
+        'cmap': cmap,
+        'levels': levels,
+        'norm': norm,
+        'colorbar_ticks': colorbar_ticks       
+    })
+
 
 def get_cmap_only(cmap_name='rain300'):
     """

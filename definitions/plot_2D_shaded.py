@@ -1,6 +1,7 @@
 import os
 import sys
 import glob
+import re
 import numpy as np
 import xarray as xr 
 import pandas as pd       
@@ -89,7 +90,8 @@ def f2p(
     out: str = "./f2p_output.png", 
     do_tight_layout: bool = True, 
     dpi: int = 180, 
-    bbox_inches: str = 'tight'
+    bbox_inches: str = 'tight',
+    close_fig: bool = True  # <-- 新增：控制是否關閉圖表的選項
 ):
     """
     plt.figure to .png (Figure to Paper)
@@ -124,12 +126,17 @@ def f2p(
     # 建立目錄
     out.parent.mkdir(parents=True, exist_ok=True)
 
-    # 存檔
+   # 存檔
     try:
         target_fig.savefig(str(out), dpi=dpi, bbox_inches=bbox_inches)
         # print(f"    [f2p] Success: {out.name}")
     except Exception as e:
         print(f"    [f2p] Save failed! Error: {e}")
+    finally:
+        # --- 新增：根據選項決定是否關閉圖表 ---
+        if close_fig:
+            plt.close(target_fig)
+            # print(f"    [f2p] Figure closed.")
 
 #--------------------------------------------
 # UV_grid to UV_lonlat
@@ -552,10 +559,14 @@ def plot_2D_shaded(array, x=None, y=None,
                    grid_type=None, 
                    gt=None,
                    grid_int=None, 
-                   grid_xticks = None, grid_yticks = None, 
-                   grid_xticks_labels = None, grid_yticks_labels = None,
-                   xlabel=" ", ylabel=" ",  
-                   xaxis_DateFormatter=None, yaxis_DateFormatter=None,
+                   grid_xticks = None,
+                   grid_yticks = None, 
+                   grid_xticks_labels = None, 
+                   grid_yticks_labels = None,
+                   xlabel=" ", 
+                   ylabel=" ",  
+                   xaxis_DateFormatter=None, 
+                   yaxis_DateFormatter=None,
                    grid_linestyle=':', 
                    grid_linewidth=1.5, 
                    grid_alpha = 0.6, 
@@ -564,20 +575,26 @@ def plot_2D_shaded(array, x=None, y=None,
                    gxylim=None,   # 例如：(100, 140, 15, 45)
 
                    # vector
-                   vx=None, vy=None, 
-                   vx_bai=None, vy_bai=None, 
-                   vc1='black', vc2='white', 
-                   vwidth=4, vlinewidth=0.4, 
+                   vx=None, 
+                   vy=None, 
+                   vx_bai=None, 
+                   vy_bai=None, 
+                   vc1='black', 
+                   vc2='white', 
+                   vwidth=4, 
+                   vlinewidth=0.4, 
                    vscale=None, 
                    vskip=None,
-                   vref=None, vunit=None, 
+                   vref=None, 
+                   vunit=None, 
                    vkey_offset=(0.00, 0.00),
                    vkey_labelpos=None,
                    vkey_color=None,        
                    vzorder = 75,   
 
                    # streamplot
-                   stream_u=None, stream_v=None,
+                   stream_u=None, 
+                   stream_v=None,
                    stream_color='blue',
                    stream_density=2,
                    stream_linewidth=0.5,
@@ -585,7 +602,9 @@ def plot_2D_shaded(array, x=None, y=None,
                    stream_zorder=80,                
 
                    # contour
-                   cnt=None, clevels=None, cints=None,
+                   cnt=None, 
+                   clevels=None, 
+                   cints=None,
                    ccolor='deeppink',
                    cwidth=(0.8, 2.0), 
                    ctype=('-', '-'), cntype=('--', '--'), 
@@ -621,7 +640,7 @@ def plot_2D_shaded(array, x=None, y=None,
                   colorbar_ticks=np.logspace(-17, 17, 18),
         cmap (str): 使用的色彩映射名稱，預設'viridis'
             常用選項：turbo, jet, RdBu_r, seismic, BrBG, binary, pink
-        annotation (bool): 是否顯示統計數據註釋(panel的左下角)，預設
+        annotation (bool): 是否顯示統計數據註釋(panel的左下角)，預設False
 
     ============ Colorbar 參數說明 ============
         colorbar (bool): 是否繪製 colorbar（預設：True）
@@ -899,6 +918,7 @@ def plot_2D_shaded(array, x=None, y=None,
             - 常用組合：黑色文字配白色描邊，或白色文字配黑色描邊
             例如：user_info_color='white', user_info_stroke_color='black'   
 
+    v1.21.2 2026-04-16 增加海岸線解析度自動容錯邏輯
     v1.21.1 2026-04-02 修改clevels邏輯 微調預設參數(
         colorbar_shrink_bai=0.6, 
         colorbar_aspect_bai=0.5,
@@ -1311,7 +1331,7 @@ def plot_2D_shaded(array, x=None, y=None,
         stats_text1 = f"mean={stats['mean']:.{ng}g}, std={stats['std']:.{ng}g}"
         stats_text2 = f"min={stats['min']:.{ng}g}, max={stats['max']:.{ng}g}"
         stats_text3 = f"Q1={stats['q1']:.{ng}g}, Q2={stats['q2']:.{ng}g}, Q3={stats['q3']:.{ng}g}"
-        ax.text(0.00, 0.00, stats_text0 + "\n" + stats_text1 + "\n" + stats_text2 + "\n" + stats_text3,
+        ax.text(0.02, 0.02, stats_text0 + "\n" + stats_text1 + "\n" + stats_text2 + "\n" + stats_text3,
                horizontalalignment='left',
                verticalalignment='bottom',
                transform=ax.transAxes,
@@ -1343,6 +1363,15 @@ def plot_2D_shaded(array, x=None, y=None,
     # ============ 參考線繪製 ============  
     # 添加海岸線（如果有投影）
     if transform is not None and coastline_color is not None:
+        
+        # --- 解析度合法性檢查 ---
+        valid_resolutions = ['110m', '50m', '10m']
+        if coastline_resolution not in valid_resolutions:
+            if not silent:
+                print(f"{ind2}警告: 無效的解析度 '{coastline_resolution}'，已自動修正為 '50m'")
+            coastline_resolution = '50m'
+        # ----------------------------
+
         print(f"{ind2}draw coastline: color: {coastline_color}, width: {coastline_width}")   
         ax.coastlines(coastline_resolution, linewidth=coastline_width[0], color=coastline_color[0],
                       zorder=4, alpha=0.8)
@@ -1738,7 +1767,7 @@ def plot_2D_shaded(array, x=None, y=None,
         # auto labelcolor
         if vkey_color is None:
             vkey_color = vc1
-            if vkey_color == 'white' or vkey_color == '#FFFFFF':
+            if vkey_color == 'white' or vkey_color == '#FFFFFF' or vkey_color == 'w':
                 vkey_color = 'black'       
         
         # 繪製主體quiverkey - 使用新函數
