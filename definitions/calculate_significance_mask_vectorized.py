@@ -45,9 +45,9 @@ def calculate_significance_mask_vectorized(data_A, data_B, test_axis=0, alpha=0.
         
         if len(valid_A) > 1 and len(valid_B) > 1:
             if test_type == 'ttest':
-                _, p_value = stats.ttest_ind(valid_B, valid_A)
+                _, p_value = stats.ttest_ind(valid_B, valid_A, equal_var=True)
             elif test_type == 'welch':
-                _, p_value = stats.ttest_ind(valid_B, valid_A)
+                _, p_value = stats.ttest_ind(valid_B, valid_A, equal_var=False)
             else:
                 raise ValueError(f"Unsupported test_type: {test_type}")
             
