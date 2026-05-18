@@ -69,6 +69,7 @@ from .add_topo_mask import *
 from .load_wrfinput_info import *
 from .def_figs_to_mp4 import *
 from .DualAccessDict import *
+from .interpolate_griddata import *
 
 # 設定別名，
 # 這些別名也會存在於 definitions 命名空間中，但不在 __all__ 裡，

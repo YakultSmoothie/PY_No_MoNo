@@ -1145,37 +1145,34 @@ def plot_2D_shaded(array, x=None, y=None,
     #        print(f"{ind2}    色彩等值線層級數: {len(levels)}")
     #        print(f"{ind2}    色彩等值線範圍:   {levels[0]} - {levels[-1]}")
 
-    # 創建圖形
+    # 創建圖形 (Create figure)
     print(f"{ind2}創建圖形:")    
-    background_color = background_color
-    print(f"{ind2}    設定背景顏色: {background_color}")
+    ax_is_new = False
+    
     if ax is None:
+        ax_is_new = True
         if projection is not None:
-            print(f"{ind2}    建立新 figure, 使用投影座標系統({type(projection).__name__})")
+            print(f"{ind2}    建立新 figure, 使用投影座標系統 ({type(projection).__name__})")
             fig = plt.figure(figsize=figsize, dpi=dpi)
             ax = fig.add_subplot(1, 1, 1, projection=projection)
-            ax.set_facecolor(background_color)
         else:
             print(f"{ind2}    建立新 figure, 使用一般座標系統")
             fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
-            ax.set_facecolor(background_color)
     else:
         print(f"{ind2}    使用既有的 ax")
         if fig is None:
-            print(f"{ind2}    由 ax 取得 figure 物件")
+            print(f"{ind2}    由 ax 取得 figure 物件 (Get figure object)")
             fig = ax.get_figure()
-        ax.set_facecolor(background_color)
 
-    # 創建圖形
-    #background_color = 'gray'
-    #if ax is None:        
-    #    fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
-    #    ax.set_facecolor(background_color)
-    #else:
-    #    if fig is None:
-    #        fig = ax.get_figure()
-    #    ax.set_facecolor(background_color)  
-      
+    # 統一設定背景與列印資訊
+    ax.set_facecolor(background_color)
+    
+    # 取得當前實體尺寸
+    w, h = fig.get_size_inches()
+    current_dpi = fig.get_dpi()
+    print(f"{ind2}    設定背景顏色: {background_color}")
+    print(f"{ind2}    圖形尺寸: {w} x {h} 英吋, DPI: {current_dpi}")
+    print(f"{ind2}    像素大小: {int(w*current_dpi)} x {int(h*current_dpi)} 像素 (Pixels)")      
     
     print(f"{ind2}    創建網格數據:")
     # 創建網格數據
@@ -2263,3 +2260,5 @@ def plot_2D_shaded(array, x=None, y=None,
         'y_grid': YY
     })
     return results
+
+p2d = plot_2D_shaded
