@@ -125,21 +125,17 @@ def plot_domains(inputs, cints_val):
 def main():
     parser = argparse.ArgumentParser(description="處理 WRF geo_em.nc 檔案並抓出地形與子網格邊界。")
     parser.add_argument("-i", "--inputs", nargs="+", required=True, help="輸入一個或多個 geo_em.d0X.nc 檔案")
-    parser.add_argument("-o", "--output", default="./plot_domain_output.png", help="輸出路徑")
-    parser.add_argument(
-        "-c", 
-        "--cints", 
-        type=float, 
-        default=10.0, 
-        help="設定經緯度等值線的間隔 (預設: 10.0)"
-    )
+    parser.add_argument("-o", "--output", default="./plot_domain_output.png", help="輸出路徑/檔名")
+    parser.add_argument("-c", "--cints", type=float, default=10.0, help="設定經緯度等值線的間隔 (預設: 10.0)")
     # -----------------
 
+    # 解析參數
     args = parser.parse_args()
 
     # 將 args.cints 傳入函式
     fig, ax = plot_domains(args.inputs, args.cints)
     
+    # save
     mydef.f2p(figure=fig, out=args.output)    
 
 if __name__ == "__main__":
