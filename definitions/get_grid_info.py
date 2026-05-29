@@ -28,6 +28,13 @@ def get_grid_info(ds_type):
             "lon_coord": "XLONG",
             "lat_coord": "XLAT",
         },
+        "metnc": {
+            "x_dim": "west_east",
+            "y_dim": "south_north",
+            "time_dim": "Time",
+            "lon_coord": "XLONG_M",
+            "lat_coord": "XLAT_M",
+        },
     }
 
     if ds_type not in grid_info:

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import matplotlib
-matplotlib.use('Agg')  # 使用非互動式 backend
+#matplotlib.use('Agg')  # 使用非互動式 backend
 import matplotlib.pyplot as plt
 # ===========================================================================================
 def figs_to_mp4(fig_list, output_filename='figs_to_mp4.mp4', fps=5, dpi=150):

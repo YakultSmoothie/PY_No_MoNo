@@ -1,27 +1,31 @@
 import os
-import sys
-import glob
-import re
-import numpy as np
-import xarray as xr 
-import pandas as pd       
-from matplotlib import colormaps
-from matplotlib.ticker import MaxNLocator
+
 import matplotlib as matplotlib
-matplotlib.use('TkAgg') # 或 'Qt5Agg'
+# matplotlib.use('TkAgg') # 或 'Qt5Agg'
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 import matplotlib.ticker as mticker     
 import matplotlib.colors as mcolors
+from matplotlib import colormaps
+from matplotlib.ticker import MaxNLocator
+import matplotlib.patheffects as patheffects
+
+import sys
+import glob
+import re
+import warnings
+from pathlib import Path
+from datetime import datetime
+from typing import Union, Optional
+
+import numpy as np
+import xarray as xr 
+import pandas as pd       
+from scipy.interpolate import RegularGridInterpolator
+
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 import cartopy.mpl.ticker as cticker   
-from datetime import datetime
-import matplotlib.patheffects as patheffects
-import warnings
-from typing import Union, Optional
-from pathlib import Path
-from scipy.interpolate import RegularGridInterpolator
 
 import definitions as mydef
 
@@ -928,7 +932,6 @@ def plot_2D_shaded(array, x=None, y=None,
     v1.20.5 2026-02-24 調整 grid_type==3 使用的格式參數為 LongitudeFormatter()
     v1.20.4 2026-01-13 微調自動設定 levels 的邏輯
     v1.20.3 2025-12-31 微調存檔方式 
-    v1.20.2 2025-12-30 指定打開互動端 matplotlib.use('TkAgg') 
     v1.19.2 2025-12-16 修正 user_info 的讀取方式錯誤
     v1.19.1 2025-11-13 調整 function 導入方式
     v1.19 2025-11-09 網格間隔自動設定邏輯優化
