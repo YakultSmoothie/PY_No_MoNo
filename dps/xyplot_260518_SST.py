@@ -37,7 +37,7 @@ def xyplot_260518_SST(
     # var_name still defined in the main procedure
     if ds_type in ["ERA5", "OISST"]:
         var_name = "sst"
-    elif ds_type in ["WRF", "w2nc"]:
+    elif ds_type in ["WRF", "w2nc", "metnc"]:
         var_name = "SST"
     else:
         raise ValueError(f"[ERROR] Unsupported ds_type: {ds_type}")

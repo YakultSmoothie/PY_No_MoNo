@@ -364,7 +364,6 @@ def ts_260515_rainfall(
     R1_land_member_mean_s = R1_land_mean_s
     R6_land_member_mean_s = R6_land_mean_s
 
-    # 初始化
     R1_land_mean_sd = None
     R6_land_mean_sd = None
     R1_land_mean_sd_n = None
@@ -447,14 +446,14 @@ def ts_260515_rainfall(
 
     title = f"{run_name}"
 
-    def _plot_rainfall_series(ax, series, label, color, color_shd, sd=None):
+    def _plot_rainfall_series(ax, series, label, color, sd=None):
 
         ax.plot(
             series.Time,
             series,
             label=label,
             color=color,
-            linewidth=2.0,            
+            linewidth=2.0
         )
 
         if sd is not None:
@@ -463,10 +462,9 @@ def ts_260515_rainfall(
                 series.Time.values,
                 (series - sd).values,
                 (series + sd).values,
-                color=color_shd,
-                alpha=0.3,
-                linewidth=0.5,
-                zorder=100,
+                color=color,
+                alpha=0.4,
+                linewidth=0
             )
 
     _plot_rainfall_series(
@@ -474,7 +472,6 @@ def ts_260515_rainfall(
         R6_land_mean,
         label='R6T',
         color='black',
-        color_shd='black',
         sd=R6_land_mean_sd
     )
 
@@ -483,7 +480,6 @@ def ts_260515_rainfall(
         R6_land_mean_n,
         label='R6n',
         color='lime',
-        color_shd='green',
         sd=R6_land_mean_sd_n
     )
 
@@ -492,7 +488,6 @@ def ts_260515_rainfall(
         R6_land_mean_s,
         label='R6s',
         color='red',
-        color_shd='red',
         sd=R6_land_mean_sd_s
     )
 
@@ -550,6 +545,8 @@ def ts_260515_rainfall(
 
     print(f"[DONE] ts_260515_rainfall : {run_name}")
     print("="*60 + "\n")
+
+    breakpoint()
 
     # ----------- return -----------
     return DualAccessDict({
