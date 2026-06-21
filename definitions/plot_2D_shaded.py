@@ -89,17 +89,73 @@ def add_system_time(fig,
 #--------------------------------------------
 # save figure
 #--------------------------------------------
+def _add_out_system_time(out_path: Path, add_out_time: bool = False) -> Path:
+    """
+    Add _YYMMDDHHMMSS before the file suffix when requested.
+    """
+    if not add_out_time:
+        return out_path
+
+    time_tag = datetime.now().strftime("%y%m%d%H%M%S")
+    return out_path.with_name(f"{out_path.stem}_{time_tag}{out_path.suffix}")
+
+
+def _resolve_out_existing_file(out_path: Path, if_exists: str = "overwrite") -> Path:
+    """
+    Resolve output path when a file already exists.
+
+    if_exists:
+        overwrite: keep the same path and overwrite existing file.
+        number: append _0001, _0002, ... until a free filename is found.
+    """
+    action = (if_exists or "overwrite").strip().lower()
+    overwrite_aliases = {"overwrite", "replace", "cover", "覆蓋"}
+    number_aliases = {"number", "numbering", "increment", "incremental", "rename", "編號"}
+
+    if action in overwrite_aliases:
+        return out_path
+
+    if action not in number_aliases:
+        raise ValueError(
+            "if_exists must be 'overwrite' or 'number' "
+            f"(got {if_exists!r})."
+        )
+
+    if not out_path.exists():
+        return out_path
+
+    # set the number
+    index = 1
+    candidate = out_path
+    while candidate.exists():
+        candidate = out_path.with_name(f"{out_path.stem}_{index:04d}{out_path.suffix}")
+        index += 1
+
+    print(
+        f"[f2p] Warning: {out_path} already exists; "
+        f"saving as {candidate}."
+    )
+    return candidate
+
+
 def f2p(
     figure: Optional[plt.Figure] = None, 
     out: str = "./f2p_output.png", 
     do_tight_layout: bool = True, 
     dpi: int = 180, 
     bbox_inches: str = 'tight',
-    close_fig: bool = True  # <-- 新增：控制是否關閉圖表的選項
+    close_fig: bool = True,  # <-- 新增：控制是否關閉圖表的選項
+    add_out_time: bool = False,
+    if_exists: str = "overwrite",
 ):
     """
     plt.figure to .png (Figure to Paper)
     將圖表保存為高品質圖片，並自動處理非法檔名。
+
+    add_out_time:
+        True 時，在副檔名前加入 _YYMMDDHHMMSS。
+    if_exists:
+        "overwrite" 覆蓋同名檔案；"number" 自動加入 _0001, _0002, ...
     """
     
     from pathlib import Path
@@ -117,6 +173,8 @@ def f2p(
     out_path = Path(out)
     sanitized_name = re.sub(r'[:\s]+', '_', out_path.name)
     out = out_path.parent / sanitized_name
+    out = _add_out_system_time(out, add_out_time=add_out_time)
+    out = _resolve_out_existing_file(out, if_exists=if_exists)
 
     print(f"[f2p] Saving figure to: {out}")
 
@@ -125,7 +183,7 @@ def f2p(
             # 針對氣象大數據繪圖，建議優先嘗試 constrained_layout
             target_fig.tight_layout()
         except Exception as e:
-            print(f"    [f2p] Warning: tight_layout failed: {e}")
+            print(f"[f2p] Warning: tight_layout failed: {e}")
             
     # 建立目錄
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -133,14 +191,14 @@ def f2p(
    # 存檔
     try:
         target_fig.savefig(str(out), dpi=dpi, bbox_inches=bbox_inches)
-        # print(f"    [f2p] Success: {out.name}")
+        # print(f"[f2p] -- Success: {out.name}")
     except Exception as e:
-        print(f"    [f2p] Save failed! Error: {e}")
+        print(f"[f2p] Save failed! Error: {e}")
     finally:
         # --- 新增：根據選項決定是否關閉圖表 ---
         if close_fig:
             plt.close(target_fig)
-            # print(f"    [f2p] Figure closed.")
+            # print(f"[f2p] Figure closed.")
 
 #--------------------------------------------
 # UV_grid to UV_lonlat
@@ -517,6 +575,8 @@ def plot_2D_shaded(array, x=None, y=None,
                    o=None, 
                    dpi=180, 
                    bbox_inches='tight',   # None, 'tight', Bbox([[0.5, 0.5], [5.5, 4.5]])
+                   add_out_time=False,
+                   if_exists="overwrite",
                    ax=None, fig=None, 
                    show=True, 
                    indent=0,
@@ -555,7 +615,7 @@ def plot_2D_shaded(array, x=None, y=None,
                    
                    # coastline
                    coastline_color=('black', 'yellow'),  # When coastline_color=None, do not draw coastline
-                   coastline_width=(2.0, 0), 
+                   coastline_width=(2.0, 0.0), 
                    coastline_resolution='50m',
 
                    # grid line
@@ -702,7 +762,7 @@ def plot_2D_shaded(array, x=None, y=None,
         coastline (tuple or None): 海岸線顏色(外層, 內層)，預設('black', 'yellow')
             - tuple: (外層顏色, 內層顏色)，繪製雙層海岸線增強可見度
             - None: 不繪製海岸線
-        coastline_width (tuple): 海岸線寬度(外層, 內層)，預設(2.0, 0)
+        coastline_width (tuple): 海岸線寬度(外層, 內層)，預設(2.0, 0.0)
             - (外層線寬, 內層線寬)，外層應略粗於內層
             例如：(2.0, 0.3), (1.5, 1.0)        
         coastline_resolution (str): 海岸線解析度，預設'50m'
@@ -769,6 +829,11 @@ def plot_2D_shaded(array, x=None, y=None,
     === 輸出控制參數 ===
         o (str): 輸出檔案路徑，如果為None則不保存
         dpi (int): 圖像解析度，預設180
+        bbox_inches (str or None): 傳給 savefig 的 bbox_inches，預設'tight'
+        add_out_time (bool): 是否在輸出檔名副檔名前加入 _YYMMDDHHMMSS，預設False
+        if_exists (str): 當輸出檔案已存在時的處理方式，預設"overwrite"
+            - "overwrite": 覆蓋原檔
+            - "number": 自動加入 _0001, _0002, ...，並在終端顯示警告
         silent (bool): 是否抑制統計資訊的終端輸出，預設False
         
     === 圖形物件參數 ===
@@ -922,11 +987,12 @@ def plot_2D_shaded(array, x=None, y=None,
             - 常用組合：黑色文字配白色描邊，或白色文字配黑色描邊
             例如：user_info_color='white', user_info_stroke_color='black'   
 
+    v1.21.3 2026-06-13 增加輸出檔名時間戳與同名檔案處理參數，並修正 bbox_inches 傳遞
     v1.21.2 2026-04-16 增加海岸線解析度自動容錯邏輯
     v1.21.1 2026-04-02 修改clevels邏輯 微調預設參數(
-        colorbar_shrink_bai=0.6, 
-        colorbar_aspect_bai=0.5,
-        vwidth=4)
+                        colorbar_shrink_bai=0.6, 
+                        colorbar_aspect_bai=0.5,
+                        vwidth=4)
     v1.21 2026-03-29 新增流線場 (streamplot) 繪製功能
     v1.20.6 2026-03-28 微調預設參數
     v1.20.5 2026-02-24 調整 grid_type==3 使用的格式參數為 LongitudeFormatter()
@@ -2248,7 +2314,15 @@ def plot_2D_shaded(array, x=None, y=None,
 
     # 保存圖像    
     if o:        
-        f2p(fig, out=o, do_tight_layout=True, dpi=dpi, bbox_inches='tight')
+        f2p(
+            fig,
+            out=o,
+            do_tight_layout=True,
+            dpi=dpi,
+            bbox_inches=bbox_inches,
+            add_out_time=add_out_time,
+            if_exists=if_exists,
+        )
     
     if not silent:
         print(f"{ind2}title: {title}")

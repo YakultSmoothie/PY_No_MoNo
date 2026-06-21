@@ -191,7 +191,10 @@ if __name__ == "__main__":
     fig, axes = plt.subplots(1, len(cmap_names), figsize=(10, 5))
        
     for ax, name in zip(axes, cmap_names):
-        cmap, levels, norm = mycmap(name)
+        plot_config = mycmap(name)
+        levels = plot_config['levels']
+        cmap = plot_config['cmap']
+        norm = plot_config['norm']
         
         cf = ax.contourf(data, levels=levels, cmap=cmap, norm=norm, extend='both')
         cbar = plt.colorbar(cf, ax=ax, label='colorbar label', ticks=levels)

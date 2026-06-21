@@ -1,4 +1,11 @@
-def calculate_anomaly(data, dims=("x", "y"), window_size=13, name="anomaly"):
+from typing import Sequence
+
+def calculate_anomaly(
+    data,
+    dims: str | Sequence[str] = ("x", "y"),
+    window_size: int | float | Sequence[int | float] = 13,
+    name: str = "anomaly",
+):
     """
     進階型距平計算函數，支援不同維度使用不同窗口大小。
     

@@ -16,6 +16,7 @@ def get_spatial_mask(
     lons: Union[NDArray[np.floating], xr.DataArray],
     lats: Union[NDArray[np.floating], xr.DataArray],
     extent: Union[Tuple[float, float, float, float], Literal['all']],
+    expand_grid: int = 1,
 ) -> DualAccessDict:
     """
     根據經緯度範圍獲取空間遮罩和索引切片
@@ -34,6 +35,10 @@ def get_spatial_mask(
         目標區域範圍 (lon_min, lon_max, lat_min, lat_max)
         若傳入 'all'，則選取整個經緯度網格範圍
         單位應與輸入經緯度陣列一致（通常為度）
+    expand_grid : int, default=1
+        在精確符合 extent 的索引範圍外，額外調整的網格格數。
+        預設為 1，維持舊版「向外延伸一格」的行為；設為 0 則不額外延伸；
+        設為負整數時會向內縮小矩形切片範圍。
     
     Returns
     -------
@@ -42,7 +47,7 @@ def get_spatial_mask(
         
         0. mask : NDArray[np.bool_]
             2維布林遮罩 (Boolean Mask)，形狀為 (n_lat, n_lon)。
-            True 表示該點在目標矩形切片區域內（含向外延伸一格）。
+            True 表示該點在目標矩形切片區域內（已套用 expand_grid 指定的外擴或內縮格數）。
         1. x_slice : slice
             經度方向 (Longitude) 的切片索引，對應陣列最後一維。
         2. y_slice : slice
@@ -68,6 +73,7 @@ def get_spatial_mask(
         - 當輸入陣列維度超過2維時
         - 當經緯度陣列形狀不一致時
         - 當目標區域沒有符合的點時
+        - 當 expand_grid 不是整數時
     
     Notes
     -----
@@ -75,23 +81,29 @@ def get_spatial_mask(
     - 支援帶有 pint/MetPy 單位的陣列（會自動提取數值部分）
     - 回傳的 slice 可直接用於原始資料陣列索引: data[y_slice, x_slice]
     - 回傳的 new_lons/new_lats 形狀與切片後的資料一致
+    - 若 expand_grid 為負且內縮幅度大於符合 extent 的索引範圍，可能回傳空切片
     
     Version History
     ---------------
+    v1.4 2026-06-12 YakultSmoothie and Codex
+        新增 expand_grid 參數，可調整外擴/內縮的網格格數，預設維持外擴 1 格
     v1.3 2026-03-13 YakultSmoothie and Gemini
         增加一個mask矩陣使用1與np.nan標記
     v1.2 2026-01-08 YakultSmoothie and Gemini
         支援 extent='all' 參數，用於保留原始完整範圍
-        新增回傳 strict_mask，代表精確符合 extent 數值範圍的遮罩（不含向外延伸的一格）
+        新增回傳 strict_mask，代表精確符合 extent 數值範圍的遮罩（不含向外延伸格）
     v1.1 2025-12-30 YakultSmoothie and Gemini
         新增回傳 new_lons 與 new_lats 陣列，方便直接取得切片後的座標系統
     v1.0.1 2025-11-20 YakultSmoothie
-        修改邊界條件為嚴格不等式(> 和 <),並向外延伸一格,含邊界保護
+        修改邊界條件為嚴格不等式(> 和 <),並向外延伸預設一格,含邊界保護
     v1.0 2025-11-13 YakultSmoothie
         初始版本,支援1D/2D輸入、單位處理、自動擴充
     """
     
     print(f"get_spatial_mask running, extent={extent} ...")
+
+    if not isinstance(expand_grid, (int, np.integer)):
+        raise ValueError("expand_grid 必須是整數")
     
     # ========== 步驟1: 處理資料格式與單位 ==========
     def get_raw_data(obj):
@@ -130,10 +142,10 @@ def get_spatial_mask(
         y_indices_raw = np.where(strict_mask.any(axis=1))[0]
 
         if len(x_indices_raw) > 0 and len(y_indices_raw) > 0:
-            x_start = max(0, int(x_indices_raw[0]) - 1)
-            x_end = min(lons_2d.shape[1] - 1, int(x_indices_raw[-1]) + 1)
-            y_start = max(0, int(y_indices_raw[0]) - 1)
-            y_end = min(lats_2d.shape[0] - 1, int(y_indices_raw[-1]) + 1)
+            x_start = max(0, int(x_indices_raw[0]) - expand_grid)
+            x_end = min(lons_2d.shape[1] - 1, int(x_indices_raw[-1]) + expand_grid)
+            y_start = max(0, int(y_indices_raw[0]) - expand_grid)
+            y_end = min(lats_2d.shape[0] - 1, int(y_indices_raw[-1]) + expand_grid)
         else:
             print(f"    警告: 目標區域沒有符合的網格點!")
             empty_mask = np.zeros_like(strict_mask, dtype=bool)
@@ -185,7 +197,7 @@ def main():
     """測試 get_spatial_mask 函數的存取方式"""
     
     print("="*80)
-    print(" 測試 get_spatial_mask 存取範例 (v1.2)")
+    print(" 測試 get_spatial_mask 存取範例 (v1.4)")
     print("="*80)
     
     # 建立模擬資料 (1D 輸入)

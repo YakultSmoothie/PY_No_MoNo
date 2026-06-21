@@ -149,10 +149,8 @@ def custom_cross_section(data, start, end, lons, lats, steps=101, method='linear
     import numpy as np
     import xarray as xr
     
-    print(f"Run custom_cross_section (v1.2) ...")
-    print(f"    建立剖面路徑: {steps} 個點")
-    print(f"    插值方法 (Method): {method}")
-    print(f"    指向計算方式: {orientation_method}")
+    print(f"Run custom_cross_section (v1.2): ({start[0]:.2f}, {start[1]:.2f}) -> ({end[0]:.2f}, {end[1]:.2f})")
+    print(f"    Path: {steps} points | Method: {method} | Orientation: {orientation_method}")
     if kwargs:
         print(f"    額外參數 (Kwargs): {kwargs}")
     
@@ -229,7 +227,6 @@ def custom_cross_section(data, start, end, lons, lats, steps=101, method='linear
     lons_grid = np.asarray(lons)
     
     # 預先計算每個網格點到剖面線的最短距離，用於篩選
-    # print(f"    計算網格點到剖面線的距離（使用 Haversine 公式）...")
     grid_points = np.column_stack([lats_grid.ravel(), lons_grid.ravel()])
     path_points = np.column_stack([lats_path, lons_path])
 
@@ -239,9 +236,8 @@ def custom_cross_section(data, start, end, lons, lats, steps=101, method='linear
     if buffer_km >= 1e5:
         # 直接產生全為 True 的布林陣列，保留所有網格點
         spatial_mask = np.ones(len(grid_points), dtype=bool)
-        print(f"    剖面緩衝區: 未設定 (buffer_km={buffer_km})，略過距離計算。")
+        print(f"    Buffer: not set (buffer_km={buffer_km}) | Use all {len(spatial_mask)} grid points")
     else:
-        print(f"    計算網格點到剖面線的距離...")
         # 計算所有網格點到所有剖面點的距離矩陣
         distances_matrix = haversine_distance_vectorized(
             grid_points[:, 0],  
@@ -253,7 +249,7 @@ def custom_cross_section(data, start, end, lons, lats, steps=101, method='linear
         # 對每個網格點，找出到剖面線的最短距離
         distances_to_path = distances_matrix.min(axis=0)
         spatial_mask = distances_to_path <= buffer_km
-        print(f"    剖面緩衝區: ±{buffer_km} km; 保留 {spatial_mask.sum()}/{len(spatial_mask)} 個網格點 ({100*spatial_mask.sum()/len(spatial_mask):.1f}%)")
+        print(f"    Buffer: ±{buffer_km} km | Use {spatial_mask.sum()}/{len(spatial_mask)} grid points ({100*spatial_mask.sum()/len(spatial_mask):.1f}%)")
        
     # 重塑 data 使最後兩維是空間維度
     original_dims = list(data.dims)
@@ -269,15 +265,11 @@ def custom_cross_section(data, start, end, lons, lats, steps=101, method='linear
     if len(other_dims) > 0:
         # 將前面所有維度合併成一維
         n_other = int(np.prod([original_shape[data.dims.index(d)] for d in other_dims]))
-        n_spatial = original_shape[-2] * original_shape[-1]
-        data_reshaped = data.values.reshape(n_other, n_spatial)
-        print(f"    資料維度: {other_dims} + {spatial_dims}")
-        print(f"    重塑為: ({n_other}, {n_spatial})")
+        data_reshaped = data.values.reshape(n_other, -1)
     else:
         # 沒有其他維度，只有空間維度
         data_reshaped = data.values.reshape(1, -1)
         n_other = 1
-        print(f"    資料維度: {spatial_dims}")
     
     # 準備結果陣列
     result = np.zeros((n_other, steps))
@@ -285,7 +277,7 @@ def custom_cross_section(data, start, end, lons, lats, steps=101, method='linear
     # 準備插值用的點（只保留在緩衝區內的點）
     points_filtered = grid_points[spatial_mask]
     
-    print(f"    開始插值 {n_other} 個切片 (Method: {method})...")
+    print(f"    Interpolating {n_other} slices...")
     
     # 對每個切片進行插值
     for idx in range(n_other):
@@ -370,10 +362,7 @@ def custom_cross_section(data, start, end, lons, lats, steps=101, method='linear
         cross_data = cross_data * original_units
         print(f"    單位: {original_units}")
     
-    print(f"    插值完成！")
-    print(f"        輸出維度: {cross_data.dims}")
-    print(f"        剖面總長度: {distances_km[-1]:.2f} km")
-    print(f"        剖面指向: {orientation_angle:.2f}° ({direction_desc})")
+    print(f"    Done: length={distances_km[-1]:.2f} km | direction={orientation_angle:.2f}° ({direction_desc})")
     
     return cross_data
 
