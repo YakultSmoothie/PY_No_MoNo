@@ -3,7 +3,7 @@
 # File: distance.py
 # Purpose: Calculate great-circle distance between two points on Earth.
 # Input: lon1 lat1 lon2 lat2, optional elapsed hours for speed.
-# Output: Distance (km), optional speed (m/s).
+# Output: Distance (km), optional speed (m/s), direction and u/v speed.
 # Created: 2026-05-29
 # Run Sample:
 #   python3 distance.py 120 23 121 24
@@ -87,6 +87,36 @@ def distance_from_lonlat(lon1, lat1, lon2, lat2, radius_km=EARTH_RADIUS_KM):
     return haversine_distance(lat1, lon1, lat2, lon2, radius_km=radius_km)
 
 
+def signed_shortest_lon_delta(lon1, lon2):
+    """回傳最短路徑的經度差，單位為 degree，正值代表往東。"""
+    return (lon2 - lon1 + 180.0) % 360.0 - 180.0
+
+
+def movement_direction_dlon_dlat(lon1, lat1, lon2, lat2):
+    """直接用 dlon, dlat 估算移動方向角，東為 0 度、北為 90 度。"""
+    dlon = signed_shortest_lon_delta(lon1, lon2)
+    dlat = lat2 - lat1
+
+    if dlon == 0.0 and dlat == 0.0:
+        return 0.0
+
+    return math.degrees(math.atan2(dlat, dlon)) % 360.0
+
+
+def movement_direction_xy(lon1, lat1, lon2, lat2, radius_km=EARTH_RADIUS_KM):
+    """用局地 x-y 座標估算移動方向角，東為 0 度、北為 90 度。"""
+    dlon = signed_shortest_lon_delta(lon1, lon2)
+    dlat = lat2 - lat1
+    mean_lat_rad = math.radians((lat1 + lat2) / 2.0)
+    dx_km = math.radians(dlon) * radius_km * math.cos(mean_lat_rad)
+    dy_km = math.radians(dlat) * radius_km
+
+    if dx_km == 0.0 and dy_km == 0.0:
+        return 0.0
+
+    return math.degrees(math.atan2(dy_km, dx_km)) % 360.0
+
+
 def validate_lonlat(lon1, lat1, lon2, lat2):
     """檢查座標範圍，維持 distance.gs 的 0..360 經度與 -90..90 緯度限制。"""
     errors = []
@@ -116,7 +146,10 @@ Examples:
 Notes:
   lon range: 0 <= lon <= 360
   lat range: -90 <= lat <= 90
-  -t dhrs: elapsed hours, must be > 0 when provided
+  -t dhrs: elapsed hours, must be > 0 when provided;
+           output speed, moving direction, u speed and v speed
+  direction default: estimate from dlon/dlat
+  --xy-direction: estimate direction from local x-y distance
         """,
     )
 
@@ -130,7 +163,7 @@ Notes:
         type=float,
         default=None,
         metavar="dhrs",
-        help="Elapsed time in hours; output speed in m/s when provided",
+        help="Elapsed time in hours; output speed, direction, and u/v speed when provided",
     )
     parser.add_argument(
         "-R",
@@ -145,6 +178,11 @@ Notes:
         type=int,
         default=6,
         help="Decimal places for printed numeric values (default: 6)",
+    )
+    parser.add_argument(
+        "--xy-direction",
+        action="store_true",
+        help="Estimate moving direction from local x-y distance instead of dlon/dlat",
     )
     parser.add_argument(
         "--version",
@@ -189,7 +227,28 @@ def main(argv=None):
 
     if args.time_hours is not None:
         speed_ms = distance_km * 1000.0 / (args.time_hours * 3600.0)
+        if args.xy_direction:
+            direction_deg = movement_direction_xy(
+                args.lon1,
+                args.lat1,
+                args.lon2,
+                args.lat2,
+                radius_km=args.radius,
+            )
+        else:
+            direction_deg = movement_direction_dlon_dlat(
+                args.lon1,
+                args.lat1,
+                args.lon2,
+                args.lat2,
+            )
+        direction_rad = math.radians(direction_deg)
+        u_speed_ms = speed_ms * math.cos(direction_rad)
+        v_speed_ms = speed_ms * math.sin(direction_rad)
         print(f"V(m/s) = {fmt.format(speed_ms)}")
+        print(f"MoveDir(deg) = {fmt.format(direction_deg)}")
+        print(f"u(m/s) = {fmt.format(u_speed_ms)}")
+        print(f"v(m/s) = {fmt.format(v_speed_ms)}")
 
     return 0
 
