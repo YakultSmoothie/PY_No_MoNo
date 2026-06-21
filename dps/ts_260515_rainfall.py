@@ -13,8 +13,6 @@ import matplotlib.dates as mdates
 
 import definitions as mydef
 from definitions.plot_2D_shaded import plot_2D_shaded as p2d
-from definitions.plot_2D_shaded import f2p as f2p
-from definitions.DualAccessDict import DualAccessDict
 
 # =============================================================================
 def get_masked_rainfall(R1, R6, land_bool_region, start_time, end_time):
@@ -552,7 +550,7 @@ def ts_260515_rainfall(
     print("="*60 + "\n")
 
     # ----------- return -----------
-    return DualAccessDict({
+    return mydef.DualAccessDict({
 
         'fig': fig,
         'ax': ax,

@@ -9,7 +9,6 @@ import cartopy.crs as ccrs
 
 import definitions as mydef
 from definitions.plot_2D_shaded import plot_2D_shaded as p2d
-from definitions.DualAccessDict import DualAccessDict
 
 # =============================================================================
 def xyplot_260513_acc_rainfall(
@@ -57,7 +56,7 @@ def xyplot_260513_acc_rainfall(
     spatial_mask = mydef.get_spatial_mask(ds.XLONG, ds.XLAT, map_config['gxylim'])
 
     # ----------- define ----------- 
-    data= (ds['RAINNC'] + ds['RAINC'])
+    data= (ds['RAINNC'] + ds['RAINC']).isel(west_east=spatial_mask['x_slice'], south_north=spatial_mask['y_slice'])
 
     # 當指定 dim_name_mean 時，印出維度名稱與大小
     if dim_name_mean is not None:
@@ -76,6 +75,7 @@ def xyplot_260513_acc_rainfall(
 
     data_end = data.sel(Time=end_time)
     data_start = data.sel(Time=start_time)
+    # breakpoint()
 
     # ----------- plot ----------- 
     # 定義共用參數 (Common Parameters)
@@ -98,6 +98,7 @@ def xyplot_260513_acc_rainfall(
     # draw main x-y plot
     result = p2d(
         title=f"{run_name}",
+        title_loc='center',
 
         array=shd, 
         colorbar_shrink_bai=0.8,
@@ -142,6 +143,11 @@ def xyplot_260513_acc_rainfall(
         color='white', 
     )
 
+    mydef.add_system_time(
+        fig=result['fig'],
+        system_time_info=None,
+    )
+
     # draw a mark on the location of max value
     result['ax'].plot(
         max_lon,
@@ -163,7 +169,7 @@ def xyplot_260513_acc_rainfall(
     plt.close(result['fig'])
 
     # ----------- return ----------- 
-    return DualAccessDict({
+    return mydef.DualAccessDict({
         'fig': result['fig'],
         'ax': result['ax'],
         'shd': shd,
