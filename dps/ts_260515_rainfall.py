@@ -102,7 +102,9 @@ def ts_260515_rainfall(
         run_name='WRF-ndown_run', 
         ax=None, 
         fig=None,
-        dim_name_mean=None
+        dim_name_mean=None,
+        do_not_save = False,
+        std_ddof=1
     ):
     """
     Plot regional land-mean 6-hour rainfall time series.
@@ -134,6 +136,12 @@ def ts_260515_rainfall(
         dim_name_mean="member" when dataset has a member dimension. If None,
         the function keeps the original single-run behavior. If provided, the
         plotted lines are ensemble means and the shaded areas show mean +/- 1 SD.
+    std_ddof : int, optional
+        Delta degrees of freedom used when calculating ensemble standard
+        deviation. Default is 1.
+    do_not_save : bool, optional
+        If True, skip saving the figure file and only return the figure, axes,
+        and calculated rainfall data. If False, save the figure to out_path.
     """
 
     print("\n" + "="*60)
@@ -149,6 +157,12 @@ def ts_260515_rainfall(
     print(f"end_time   = {end_time}")
     print(f"out_dir    = {out_dir}")
     print(f"dim_name_mean = {dim_name_mean}")
+    print(f"std_ddof = {std_ddof}")
+    print("[INFO] input dataset info")
+    print(f"dataset type = {type(dataset).__name__}")
+    print(f"dataset sizes = {dict(dataset.sizes)}")
+    print(f"dataset coords = {list(dataset.coords)}")
+    print(f"dataset data_vars = {list(dataset.data_vars)}")
 
     # ----------- 空間選取 -----------
     print("\n[INFO] spatial selection ...")
@@ -196,12 +210,14 @@ def ts_260515_rainfall(
             f"land points = {np.sum(landmask_sel.values == 1)}"
         )
 
-        _ = p2d(
-            landmask_sel,
-            **xy_config,
-            o=f"{out_dir}/z_landmask.png",
-            show=0
-        )
+        if do_not_save == False:
+            _ = p2d(
+                landmask_sel,
+                **xy_config,
+                o=f"{out_dir}/z_landmask.png",
+                system_time=True,
+                show=0
+            )
 
     else:
 
@@ -313,6 +329,7 @@ def ts_260515_rainfall(
         & (lat2d <= 23.5)
     )
 
+    print(f"all grids = {lon2d.size}")
     print(f"valid land grids [R6T] = {np.sum(land_bool.values)}")
     print(f"valid land grids [R6n] = {np.sum(land_bool_n.values)}")
     print(f"valid land grids [R6s] = {np.sum(land_bool_s.values)}")
@@ -385,11 +402,13 @@ def ts_260515_rainfall(
         )
         R1_land_mean_sd = R1_land_member_mean.std(
             dim=dim_name_mean,
-            skipna=True
+            skipna=True,
+            ddof=std_ddof
         )
         R6_land_mean_sd = R6_land_member_mean.std(
             dim=dim_name_mean,
-            skipna=True
+            skipna=True,
+            ddof=std_ddof
         )
 
         # n
@@ -403,11 +422,13 @@ def ts_260515_rainfall(
         )
         R1_land_mean_sd_n = R1_land_member_mean_n.std(
             dim=dim_name_mean,
-            skipna=True
+            skipna=True,
+            ddof=std_ddof
         )
         R6_land_mean_sd_n = R6_land_member_mean_n.std(
             dim=dim_name_mean,
-            skipna=True
+            skipna=True,
+            ddof=std_ddof
         )
 
         # s
@@ -421,11 +442,13 @@ def ts_260515_rainfall(
         )
         R1_land_mean_sd_s = R1_land_member_mean_s.std(
             dim=dim_name_mean,
-            skipna=True
+            skipna=True,
+            ddof=std_ddof
         )
         R6_land_mean_sd_s = R6_land_member_mean_s.std(
             dim=dim_name_mean,
-            skipna=True
+            skipna=True,
+            ddof=std_ddof
         )
 
         print(
@@ -446,6 +469,9 @@ def ts_260515_rainfall(
     title = f"{run_name}"
 
     def _plot_rainfall_series(ax, series, label, color, color_shd, sd=None):
+        """
+        Plot one rainfall time series with optional SD shading.
+        """
 
         ax.plot(
             series.Time,
@@ -536,15 +562,18 @@ def ts_260515_rainfall(
     ax.set_ylabel("[mm/6h]")
     ax.set_xlabel("Time [UTC]")
 
+    mydef.add_system_time(fig=fig)
+
     # ----------- save -----------
     print("\n[INFO] saving figure ...")
 
     out_fn = f"A_{clean_time_start}-{clean_time_end}.png"
     out_path = os.path.join(out_dir, out_fn)
 
-    mydef.f2p(fig, out_path)
+    if do_not_save == False:
+        mydef.f2p(fig, out_path, close_fig=False)
 
-    plt.close(fig)
+    # plt.close(fig)
 
     print(f"[DONE] ts_260515_rainfall : {run_name}")
     print("="*60 + "\n")
@@ -592,5 +621,6 @@ def ts_260515_rainfall(
         'land_bool_s': land_bool_s,
 
         'dim_name_mean': dim_name_mean,
+        'std_ddof': std_ddof,
         'out_path': out_path,
     })

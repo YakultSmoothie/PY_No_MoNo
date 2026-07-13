@@ -11,6 +11,100 @@ import definitions as mydef
 from definitions.plot_2D_shaded import plot_2D_shaded as p2d
 
 # =============================================================================
+def _plot_acc_rainfall_map(
+    shd,
+    data,
+    map_config,
+    mycmap_str,
+    run_name,
+    end_time,
+    delta_T,
+    max_shd,
+    max_lon,
+    max_lat,
+    ax=None,
+    fig=None
+    ):
+    """
+    Draw accumulated rainfall map and annotate time and maximum rainfall.
+    """
+
+    # 定義共用參數 (Common Parameters)
+    plot_config = mydef.mycmap(mycmap_str)  # get cmap and levels
+    xy_config = {
+        'x': data.XLONG,
+        'y': data.XLAT,
+        'gt': 3
+    }
+
+    # draw main x-y plot
+    result = p2d(
+        title=f"{run_name}",
+        title_loc='center',
+
+        array=shd,
+        colorbar_shrink_bai=0.8,
+        colorbar_label="[mm]",
+
+        **map_config,
+        **plot_config,
+        **xy_config,
+
+        figsize=(5, 5),
+        ax=ax,
+        fig=fig,
+        show=False
+    )
+
+    # draw time info
+    mydef.add_user_info_text(
+        ax=result['ax'],
+        user_info=[
+            f"{end_time}",
+            f"{delta_T} h",
+        ],
+        loc="inner upper left",
+        offset=(0, 0),
+        fontsize=10,
+        stroke_width=2.5,
+        color='white',
+        stroke_color='black',
+    )
+
+    # draw the max value
+    mydef.add_user_info_text(
+        ax=result['ax'],
+        user_info=[
+            f"{max_shd:.0f}",
+        ],
+        loc="inner lower right",
+        offset=(0, 0),
+        fontsize=22,
+        stroke_width=3.5,
+        stroke_color='black',
+        color='white',
+    )
+
+    mydef.add_system_time(
+        fig=result['fig'],
+        system_time_info=None,
+    )
+
+    # draw a mark on the location of max value
+    result['ax'].plot(
+        max_lon,
+        max_lat,
+        marker='x',
+        color='black',
+        markersize=9,
+        markeredgewidth=1.5,
+        zorder=999
+    )
+
+    return result
+
+
+# =============================================================================
 def xyplot_260513_acc_rainfall(
     ds, 
     delta_T, 
@@ -21,7 +115,8 @@ def xyplot_260513_acc_rainfall(
     ax=None, 
     fig=None, 
     dim_name_mean=None, 
-    mycmap_str='rain300'
+    mycmap_str='rain300',
+    do_not_plot=False
     ):
     """
     Plot accumulated rainfall from WRF cumulative rainfall variables.
@@ -50,8 +145,25 @@ def xyplot_260513_acc_rainfall(
     mycmap_str : str, optional
         Colormap configuration name passed to mydef.mycmap.
         Default is 'rain300'.
+    do_not_plot : bool, optional
+        If True, skip plotting and saving the figure, and only return the
+        calculated rainfall results. Default is False.
     """
-    
+
+    print("\n" + "="*60)
+    print(f"[START] xyplot_260513_acc_rainfall : {run_name}")
+    print("="*60)
+    print(f"delta_T   = {delta_T}")
+    print(f"end_time  = {end_time}")
+    print(f"output_root = {output_root}")
+    print(f"dim_name_mean = {dim_name_mean}")
+    print(f"do_not_plot = {do_not_plot}")
+    print("[INFO] input dataset info")
+    print(f"dataset type = {type(ds).__name__}")
+    print(f"dataset sizes = {dict(ds.sizes)}")
+    print(f"dataset coords = {list(ds.coords)}")
+    print(f"dataset data_vars = {list(ds.data_vars)}")
+
     # 空間選取
     spatial_mask = mydef.get_spatial_mask(ds.XLONG, ds.XLAT, map_config['gxylim'])
 
@@ -77,15 +189,6 @@ def xyplot_260513_acc_rainfall(
     data_start = data.sel(Time=start_time)
     # breakpoint()
 
-    # ----------- plot ----------- 
-    # 定義共用參數 (Common Parameters)
-    plot_config = mydef.mycmap(mycmap_str)  # get cmap and levels
-    xy_config = {
-        'x': data.XLONG,
-        'y': data.XLAT,
-        'gt': 3
-    }
-
     # 找最大值位置
     # shd = rain_acc.sel(Time=end_time).squeeze(drop=True)
     shd = (data_end - data_start).squeeze(drop=True)
@@ -95,68 +198,38 @@ def xyplot_260513_acc_rainfall(
     max_lon = shd.XLONG.values[iy, ix]
     max_lat = shd.XLAT.values[iy, ix]
 
-    # draw main x-y plot
-    result = p2d(
-        title=f"{run_name}",
-        title_loc='center',
+    # [True]: 不執行繪圖直接回傳
+    if do_not_plot == True:
+        print(
+            "[INFO] do_not_plot=True -> skip plotting and saving figure; "
+            "return calculated results only."
+        )
 
-        array=shd, 
-        colorbar_shrink_bai=0.8,
-        colorbar_label="[mm]",
+        # ----------- return -----------
+        return mydef.DualAccessDict({
+            'fig': None,
+            'ax': None,
+            'shd': shd,
+            'max_shd': max_shd,
+            'max_lon': max_lon,
+            'max_lat': max_lat,
+            'out_path': None,
+        })
 
-        **map_config, 
-        **plot_config, 
-        **xy_config,
-
-        figsize=(5, 5),
+    # ----------- plot -----------
+    result = _plot_acc_rainfall_map(
+        shd=shd,
+        data=data,
+        map_config=map_config,
+        mycmap_str=mycmap_str,
+        run_name=run_name,
+        end_time=end_time,
+        delta_T=delta_T,
+        max_shd=max_shd,
+        max_lon=max_lon,
+        max_lat=max_lat,
         ax=ax,
-        fig=fig,
-        show=False
-    ) 
-
-    # draw time info
-    mydef.add_user_info_text(
-        ax=result['ax'],
-        user_info=[
-            f"{end_time}",
-            f"{delta_T} h",
-        ],
-        loc="inner upper left",
-        offset=(0, 0),
-        fontsize=10,
-        stroke_width=2.5,
-        color='white', 
-        stroke_color='black',
-    )
-
-    # draw the max value
-    mydef.add_user_info_text(
-        ax=result['ax'],
-        user_info=[
-            f"{max_shd:.0f}",
-        ],
-        loc="inner lower right",
-        offset=(0, 0),
-        fontsize=22,
-        stroke_width=3.5,
-        stroke_color='black',
-        color='white', 
-    )
-
-    mydef.add_system_time(
-        fig=result['fig'],
-        system_time_info=None,
-    )
-
-    # draw a mark on the location of max value
-    result['ax'].plot(
-        max_lon,
-        max_lat,
-        marker='x',
-        color='black',
-        markersize=9,
-        markeredgewidth=1.5,
-        zorder=999
+        fig=fig
     )
     
     # ----------- save ----------- 

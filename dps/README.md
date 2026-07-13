@@ -1,12 +1,13 @@
 # PY_No_MoNo dps 程式總表
 
-更新日期：2026-06-21  |  README.md編輯：Codex（GPT-5）
+更新日期：2026-07-06  |  README.md編輯：Codex（GPT-5）
 
 ## 降雨繪圖
 
 | 程式名 | 簡單說明 |
 |---|---|
 | [xyplot_260513_acc_rainfall.py](xyplot_260513_acc_rainfall.py) | 由 WRF 的 `RAINNC`、`RAINC` 繪製指定時段累積雨量分布圖，可先對指定維度取平均。 |
+| [xyplot_auto_r1_acc_rainfall.py](xyplot_auto_r1_acc_rainfall.py) | 由 auto_r1 時雨量資料加總指定時間窗，繪製累積雨量分布圖。 |
 | [ts_260515_rainfall.py](ts_260515_rainfall.py) | 計算指定區域陸地平均的 1 小時、6 小時雨量，並繪製 6 小時雨量時間序列。 |
 
 ## 海溫繪圖
@@ -19,7 +20,7 @@
 
 | 程式名 | 簡單說明 |
 |---|---|
-| [__init__.py](__init__.py) | 匯出累積雨量圖、雨量時間序列與 SST 圖函式，可用 `import dps` 匯入。 |
+| [__init__.py](__init__.py) | 匯出累積雨量圖、auto_r1 累積雨量圖、雨量時間序列與 SST 圖函式，可用 `import dps` 匯入。 |
 
 ## 備註
 
