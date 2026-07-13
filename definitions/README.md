@@ -1,12 +1,14 @@
 # PY_No_MoNo definitions 程式總表
 
-更新日期：2026-06-21  |  README.md編輯：Codex（GPT-5）
+更新日期：2026-07-13  |  README.md編輯：Codex（GPT-5.5）
 
 ## 繪圖與地圖
 
 | 程式名 | 簡單說明 |
 |---|---|
 | [plot_2D_shaded.py](plot_2D_shaded.py) | 繪製 2D 陰影圖、等值線、向量與地圖要素，並提供圖檔輸出功能。 |
+| [plot_lines.py](plot_lines.py) | 繪製單條或多條一維折線，支援既有 fig/ax、參考線與圖檔輸出。 |
+| [add_system_time](plot_2D_shaded.py) | 在 matplotlib Figure 右下角加入來源程式、系統時間與額外資訊標註。 |
 | [mycmap.py](mycmap.py) | 提供常用的自訂色階、色階範圍與 levels。 |
 | [add_user_info_text.py](add_user_info_text.py) | 在 matplotlib 圖面指定位置加入使用者資訊文字與描邊。 |
 | [add_cross_section_milestones.py](add_cross_section_milestones.py) | 在垂直剖面圖上標示指定里程或位置的刻度與標記。 |
@@ -25,6 +27,7 @@
 | [set_ll.py](set_ll.py) | 依常用區域名稱或自訂範圍取得地圖經緯度範圍、海岸線解析度與格線間距。 |
 | [geo_to_proj_coords.py](geo_to_proj_coords.py) | 將經緯度座標轉換為指定 Cartopy 投影座標。 |
 | [interpolate_griddata.py](interpolate_griddata.py) | 使用 `scipy.interpolate.griddata` 將資料內插到目標經緯度網格。 |
+| [taiwan_land_mask.py](taiwan_land_mask.py) | 使用 `regionmask` 建立台灣陸地遮罩，支援以 `expand_grid` 外擴或內縮遮罩，並將台灣陸地以外的資料改為 `np.nan`。 |
 
 ## 資料與座標資訊
 
@@ -57,9 +60,9 @@
 
 | 程式名 | 簡單說明 |
 |---|---|
-| [__init__.py](__init__.py) | 匯出常用函式，並提供 `p2d`、`ari`、`q2x`、`auit`、`lwnc` 等短名別名。 |
+| [__init__.py](__init__.py) | 匯出常用函式，並提供 `p2d`、`pln`、`ari`、`q2x`、`auit`、`lwnc` 等短名別名。 |
 
 ## 備註
 
 - 未列入 `.png` 圖檔、`.mp4` 範例檔，以及本說明檔。
-- 一般可用 `import definitions as mydef` 匯入；例如 `mydef.p2d(...)` 對應 `plot_2D_shaded(...)`。
+- 一般可用 `import definitions as mydef` 匯入；例如 `mydef.p2d(...)` 對應 `plot_2D_shaded(...)`，`mydef.pln(...)` 對應 `plot_lines(...)`。

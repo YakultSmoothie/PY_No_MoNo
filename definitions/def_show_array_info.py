@@ -17,6 +17,7 @@ def array_info(data, var_name="Variable", indent=0, lite=False):
         - 單位資訊（如有）
         - 座標資訊(xarray專用)
 
+    v1.6 - 2026/06/29 - YakultSmoothie - WRF 2D經緯度座標自動對應
     v1.5 - 2025/10/23 - YakultSmoothie - 微調輸出顯示
     v1.4 - 2025/10/09 - YakultSmoothie
     v1.3 - 2025/10/01 - YakultSmoothie
@@ -81,17 +82,41 @@ def array_info(data, var_name="Variable", indent=0, lite=False):
     if isinstance(data, xr.DataArray):
         print(f"{ind}維度名稱: {data.dims}")
         print(f"{ind}座標軸:")
+        fallback_coords = {
+            "south_north": "XLAT",
+            "west_east": "XLONG",
+        }
         for dim in data.dims:
-            # 確保該維度在座標中存在
-            if dim not in data.coords:
+            coord_name = dim
+            auto_switched = False
+
+            # WRF 常見情況：維度本身沒有座標，但有 2D XLAT/XLONG。
+            if coord_name not in data.coords and dim in fallback_coords:
+                fallback_name = fallback_coords[dim]
+                if fallback_name in data.coords:
+                    coord_name = fallback_name
+                    auto_switched = True
+
+            # 確保該維度或自動對應座標在座標中存在
+            if coord_name not in data.coords:
                 print(f"{ind2}{dim}: 無座標資訊")
                 continue
                 
-            coord_values = data.coords[dim].values
+            coord_values = data.coords[coord_name].values
             
             # 處理多維座標的情況（例如 2D 座標）
             if coord_values.ndim > 1:
-                print(f"{ind2}{dim}: 多維座標 shape={coord_values.shape}")
+                if np.issubdtype(coord_values.dtype, np.number):
+                    coord_min = np.nanmin(coord_values)
+                    coord_max = np.nanmax(coord_values)
+                    range_str = f"範圍 [{coord_min:.4g} to {coord_max:.4g}], "
+                else:
+                    range_str = ""
+
+                if auto_switched:
+                    print(f"{ind2}{dim}: 自動改用 {coord_name}, {range_str}多維座標 shape={coord_values.shape}")
+                else:
+                    print(f"{ind2}{dim}: {range_str}多維座標 shape={coord_values.shape}")
                 continue
             
             # 取得第一個和最後一個值
@@ -118,7 +143,10 @@ def array_info(data, var_name="Variable", indent=0, lite=False):
                 first_val = str(first_val_raw)
                 last_val = str(last_val_raw)
                 
-            print(f"{ind2}{dim}: 範圍 [{first_val} to {last_val}], 長度 {len(coord_values)}")
+            if auto_switched:
+                print(f"{ind2}{dim}: 自動改用 {coord_name}, 範圍 [{first_val} to {last_val}], 長度 {len(coord_values)}")
+            else:
+                print(f"{ind2}{dim}: 範圍 [{first_val} to {last_val}], 長度 {len(coord_values)}")
 
     
     # 處理遮罩陣列

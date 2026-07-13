@@ -1,3 +1,4 @@
+import builtins
 import os
 
 import matplotlib as matplotlib
@@ -16,6 +17,8 @@ import re
 import warnings
 from pathlib import Path
 from datetime import datetime
+from zoneinfo import ZoneInfo
+
 from typing import Union, Optional
 
 import numpy as np
@@ -32,6 +35,14 @@ import definitions as mydef
 #--------------------------------------------
 # save figure
 #--------------------------------------------
+
+def get_system_timezone():
+    try:
+        tz_path = os.path.realpath("/etc/localtime")
+        return tz_path.split("zoneinfo/")[-1]
+    except Exception:
+        return "UTC"  # 偵測失敗時的備援(fallback)
+    
 def add_system_time(fig, 
                      system_time_info=None, 
                      offset=(0.00, 0.00), 
@@ -51,10 +62,15 @@ def add_system_time(fig,
         silent (bool): 是否抑制終端輸出。
         indent (int): 終端輸出縮排。
     """
-    from datetime import datetime
     
     script_name = os.path.basename(sys.argv[0])
-    current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+    tz_name = get_system_timezone()
+    tz = ZoneInfo(tz_name)
+    now = datetime.now(tz)
+    current_time = now.strftime("%Y-%m-%d %H:%M:%S")
+    current_time = f"{tz_name} {current_time}"
+
     base_info = f"Source: {script_name}\nSystem time: {current_time}"
     
     # 處理 system_time_info 的格式
@@ -89,24 +105,35 @@ def add_system_time(fig,
 #--------------------------------------------
 # save figure
 #--------------------------------------------
-def _add_out_system_time(out_path: Path, add_out_time: bool = False) -> Path:
+def _add_out_system_time(
+    out_path: Path,
+    add_out_time: bool = False,
+    add_out_time_dash: bool = False,
+) -> Path:
     """
-    Add _YYMMDDHHMMSS before the file suffix when requested.
+    Add a system-time suffix before the file suffix when requested.
     """
-    if not add_out_time:
+    if not add_out_time and not add_out_time_dash:
         return out_path
 
-    time_tag = datetime.now().strftime("%y%m%d%H%M%S")
+    time_format = "%y%m%d-%H%M%S" if add_out_time_dash else "%y%m%d%H%M%S"
+    time_tag = datetime.now().strftime(time_format)
     return out_path.with_name(f"{out_path.stem}_{time_tag}{out_path.suffix}")
 
 
-def _resolve_out_existing_file(out_path: Path, if_exists: str = "overwrite") -> Path:
+def _resolve_out_existing_file(
+    out_path: Path,
+    if_exists: str = "overwrite",
+    indent: int = 0,
+) -> Path:
     """
     Resolve output path when a file already exists.
 
     if_exists:
         overwrite: keep the same path and overwrite existing file.
         number: append _0001, _0002, ... until a free filename is found.
+    indent:
+        Number of spaces before terminal messages.
     """
     action = (if_exists or "overwrite").strip().lower()
     overwrite_aliases = {"overwrite", "replace", "cover", "覆蓋"}
@@ -131,8 +158,9 @@ def _resolve_out_existing_file(out_path: Path, if_exists: str = "overwrite") -> 
         candidate = out_path.with_name(f"{out_path.stem}_{index:04d}{out_path.suffix}")
         index += 1
 
+    ind = " " * indent
     print(
-        f"[f2p] Warning: {out_path} already exists; "
+        f"{ind}[f2p] Warning: {out_path} already exists; "
         f"saving as {candidate}."
     )
     return candidate
@@ -146,7 +174,9 @@ def f2p(
     bbox_inches: str = 'tight',
     close_fig: bool = True,  # <-- 新增：控制是否關閉圖表的選項
     add_out_time: bool = False,
+    add_out_time_dash: bool = False,
     if_exists: str = "overwrite",
+    indent: int = 0,
 ):
     """
     plt.figure to .png (Figure to Paper)
@@ -154,18 +184,24 @@ def f2p(
 
     add_out_time:
         True 時，在副檔名前加入 _YYMMDDHHMMSS。
+    add_out_time_dash:
+        True 時，在副檔名前加入 _YYMMDD-HHMMSS。若同時啟用，優先使用此格式。
     if_exists:
         "overwrite" 覆蓋同名檔案；"number" 自動加入 _0001, _0002, ...
+    indent:
+        終端輸出縮排空格數，預設 0。
     """
     
     from pathlib import Path
     import re
     import matplotlib.pyplot as plt
+
+    ind = " " * indent
     
     target_fig = figure if figure is not None else plt.gcf()
 
     if not out:
-        print("[f2p] 錯誤：未指定輸出路徑。")
+        print(f"{ind}[f2p] 錯誤：未指定輸出路徑。")
         return
 
     # --- 新增：處理非法字元 (Sanitize filename) ---
@@ -173,17 +209,21 @@ def f2p(
     out_path = Path(out)
     sanitized_name = re.sub(r'[:\s]+', '_', out_path.name)
     out = out_path.parent / sanitized_name
-    out = _add_out_system_time(out, add_out_time=add_out_time)
-    out = _resolve_out_existing_file(out, if_exists=if_exists)
+    out = _add_out_system_time(
+        out,
+        add_out_time=add_out_time,
+        add_out_time_dash=add_out_time_dash,
+    )
+    out = _resolve_out_existing_file(out, if_exists=if_exists, indent=indent)
 
-    print(f"[f2p] Saving figure to: {out}")
+    print(f"{ind}[f2p] Saving figure to: {out}")
 
     if do_tight_layout:
         try:
             # 針對氣象大數據繪圖，建議優先嘗試 constrained_layout
             target_fig.tight_layout()
         except Exception as e:
-            print(f"[f2p] Warning: tight_layout failed: {e}")
+            print(f"{ind}[f2p] Warning: tight_layout failed: {e}")
             
     # 建立目錄
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -193,12 +233,42 @@ def f2p(
         target_fig.savefig(str(out), dpi=dpi, bbox_inches=bbox_inches)
         # print(f"[f2p] -- Success: {out.name}")
     except Exception as e:
-        print(f"[f2p] Save failed! Error: {e}")
+        print(f"{ind}[f2p] Save failed! Error: {e}")
     finally:
         # --- 新增：根據選項決定是否關閉圖表 ---
         if close_fig:
             plt.close(target_fig)
             # print(f"[f2p] Figure closed.")
+
+
+def p2d_quick_save_kwargs(
+    o="p2dqs.jpg",
+    *,
+    show=False,
+    add_out_time_dash=True,
+    system_time=True,
+    if_exists="number",
+    **overrides,
+):
+    """
+    Return common keyword arguments for quickly saving figures with p2d().
+
+    Examples:
+        p2d(a, **mydef.qs())
+
+        qs = mydef.p2d_quick_save_kwargs("rain.jpg", dpi=300, silent=True)
+        p2d(a, **qs)
+    """
+    qs = {
+        "o": o,
+        "show": show,
+        "add_out_time_dash": add_out_time_dash,
+        "system_time": system_time,
+        "if_exists": if_exists,
+    }
+    qs.update(overrides)
+    return qs
+
 
 #--------------------------------------------
 # UV_grid to UV_lonlat
@@ -576,6 +646,7 @@ def plot_2D_shaded(array, x=None, y=None,
                    dpi=180, 
                    bbox_inches='tight',   # None, 'tight', Bbox([[0.5, 0.5], [5.5, 4.5]])
                    add_out_time=False,
+                   add_out_time_dash=False,
                    if_exists="overwrite",
                    ax=None, fig=None, 
                    show=True, 
@@ -674,6 +745,7 @@ def plot_2D_shaded(array, x=None, y=None,
                    ctype=('-', '-'), cntype=('--', '--'), 
                    clab=(False, True),
                    clab_fontweight=(5, 5),  # 新增參數
+                   clab_stroke_width=0.0,
                    clab_manuals1: list[tuple[float, float]] | bool =False,     # 標籤位置
                    clab_manuals2: list[tuple[float, float]] | bool =False,
                    czorder=None,  
@@ -831,10 +903,12 @@ def plot_2D_shaded(array, x=None, y=None,
         dpi (int): 圖像解析度，預設180
         bbox_inches (str or None): 傳給 savefig 的 bbox_inches，預設'tight'
         add_out_time (bool): 是否在輸出檔名副檔名前加入 _YYMMDDHHMMSS，預設False
+        add_out_time_dash (bool): 是否在輸出檔名副檔名前加入 _YYMMDD-HHMMSS，預設False
+            若與 add_out_time 同時啟用，優先使用此格式。
         if_exists (str): 當輸出檔案已存在時的處理方式，預設"overwrite"
             - "overwrite": 覆蓋原檔
             - "number": 自動加入 _0001, _0002, ...，並在終端顯示警告
-        silent (bool): 是否抑制統計資訊的終端輸出，預設False
+        silent (bool): 預設 False 顯示詳細資訊；True 僅顯示 p2d 五分位數摘要
         
     === 圖形物件參數 ===
         ax: matplotlib axes物件，若為None則自動創建
@@ -918,6 +992,8 @@ def plot_2D_shaded(array, x=None, y=None,
             - list of tuple: 多組等值線各自的字重
             - 常用值：3(細), 4(正常), 5(稍粗), 6(粗), 7(很粗), 8(極粗)
                 例如：[(4, 6), (5, 7)]
+        clab_stroke_width (float): 等值線標籤白邊寬度，預設0.0表示不加白邊
+            - 例如：clab_stroke_width=2.5
         clab_manuals1 (bool or list of tuples): 細線標籤位置，預設 False
             - False: 使用預設自動標籤位置
             - list of tuples: 手動指定標籤座標 (x, y)
@@ -987,6 +1063,11 @@ def plot_2D_shaded(array, x=None, y=None,
             - 常用組合：黑色文字配白色描邊，或白色文字配黑色描邊
             例如：user_info_color='white', user_info_stroke_color='black'   
 
+    == Update ==
+    v1.21.7 2026-07-13 精簡 silent=True 輸出為 p2d 統計摘要
+    v1.21.6 2026-07-06 增加 p2d_quick_save_kwargs 快速存檔參數字典 helper
+    v1.21.5 2026-07-06 增加 add_out_time_dash 參數，可在輸出檔名加入 _YYMMDD-HHMMSS
+    v1.21.4 2026-06-29 增加 clab_stroke_width 參數控制等值線標籤白邊寬度
     v1.21.3 2026-06-13 增加輸出檔名時間戳與同名檔案處理參數，並修正 bbox_inches 傳遞
     v1.21.2 2026-04-16 增加海岸線解析度自動容錯邏輯
     v1.21.1 2026-04-02 修改clevels邏輯 微調預設參數(
@@ -1079,6 +1160,35 @@ def plot_2D_shaded(array, x=None, y=None,
         numpy.ndarray: XX - 網格經度座標
         numpy.ndarray: YY - 網格緯度座標
     '''
+
+    def _verbose_print(*args, **kwargs):
+        """僅在非安靜模式輸出詳細執行訊息。"""
+        if not silent:
+            builtins.print(*args, **kwargs)
+
+    def _format_summary_stats(label, stat_source, key_prefix=""):
+        """將一組統計值格式化為安靜模式的單行摘要。"""
+        stat_keys = {
+            "P0": "min",
+            "P25": "q1",
+            "P50": "q2",
+            "P75": "q3",
+            "P100": "max",
+        }
+        values = {
+            percentile: format(
+                stat_source.get(f"{key_prefix}{stat_key}", np.nan),
+                ".6g",
+            )
+            for percentile, stat_key in stat_keys.items()
+        }
+        return (
+            f"{ind2}{label}:  P0: {values['P0']} | P25: {values['P25']} | "
+            f"P50: {values['P50']} | P75: {values['P75']} | P100: {values['P100']}"
+        )
+
+    # 將函式內所有舊有詳細訊息統一交由 silent 控制。
+    print = _verbose_print
 
     
     # 建立縮排字串
@@ -2002,6 +2112,7 @@ def plot_2D_shaded(array, x=None, y=None,
         cntype_list = _make_list(cntype, n_contours, 'cntype')
         clab_list = _make_list(clab, n_contours, 'clab')
         clab_fontweight_list = _make_list(clab_fontweight, n_contours, 'clab_fontweight')  # 新增
+        clab_stroke_width_list = _make_list(clab_stroke_width, n_contours, 'clab_stroke_width')
         czorder_list = _make_list(czorder, n_contours, 'czorder')  
                 
         # 初始化統計資訊字典
@@ -2028,6 +2139,7 @@ def plot_2D_shaded(array, x=None, y=None,
             cntype_current = cntype_list[i_cnt]
             clab_current = clab_list[i_cnt]
             clab_fontweight_current = clab_fontweight_list[i_cnt]  # 新增
+            clab_stroke_width_current = clab_stroke_width_list[i_cnt]
             #czorder_list = czorder_list[i_cnt]
             
             # 處理等值線數據（支援xarray和pint）
@@ -2165,6 +2277,13 @@ def plot_2D_shaded(array, x=None, y=None,
                             # 對每個標籤逐一進行修改                       
                             label.set_fontweight(clab_fontweight_current[0]*100)  # 根據測試, 只支援200～900
                             label.set_fontsize(10)
+                            if clab_stroke_width_current > 0:
+                                label.set_path_effects([
+                                    patheffects.withStroke(
+                                        linewidth=clab_stroke_width_current,
+                                        foreground='white'
+                                    )
+                                ])
                 
                 # 繪製粗線等值線
                 if len(clevels2) > 0:
@@ -2190,6 +2309,13 @@ def plot_2D_shaded(array, x=None, y=None,
                             # 對每個標籤逐一進行修改                       
                             label.set_fontweight(clab_fontweight_current[1]*100)  # 使用參數
                             label.set_fontsize(10)
+                            if clab_stroke_width_current > 0:
+                                label.set_path_effects([
+                                    patheffects.withStroke(
+                                        linewidth=clab_stroke_width_current,
+                                        foreground='white'
+                                    )
+                                ])
 
                 # 儲存等值線levels到統計資訊
                 contour_stat['levels_thin'] = clevels1_filtered
@@ -2312,6 +2438,21 @@ def plot_2D_shaded(array, x=None, y=None,
     else:
         print(f'{ind2}show: False')
 
+    if silent:
+        builtins.print(f"{ind}p2d (")
+        builtins.print(f"{ind2}title: {title}")
+        builtins.print(f"{ind2}shape: {array.shape}")
+        builtins.print(_format_summary_stats("shd", stats))
+
+        if vx is not None and vy is not None:
+            builtins.print(_format_summary_stats("vct", stats, key_prefix="vector_"))
+
+        for contour_index, contour_stat in enumerate(
+            stats.get("contour_stats", []),
+            start=1,
+        ):
+            builtins.print(_format_summary_stats(f"cnt{contour_index}", contour_stat))
+
     # 保存圖像    
     if o:        
         f2p(
@@ -2321,8 +2462,13 @@ def plot_2D_shaded(array, x=None, y=None,
             dpi=dpi,
             bbox_inches=bbox_inches,
             add_out_time=add_out_time,
+            add_out_time_dash=add_out_time_dash,
             if_exists=if_exists,
+            indent=indent + 4 if silent else 0,
         )
+
+    if silent:
+        builtins.print(f"{ind})")
     
     if not silent:
         print(f"{ind2}title: {title}")

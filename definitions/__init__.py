@@ -23,9 +23,13 @@ from .def_figs_to_mp4 import *
 from .DualAccessDict import *
 from .interpolate_griddata import *
 from .get_dico_names import *
+from .taiwan_land_mask import *
+from .plot_lines import *
 
 # 常用別名
 p2d = plot_2D_shaded
+pln = plot_lines
+qs = p2d_quick_save_kwargs
 ari = array_info
 q2x = quantity_to_xarray
 auit = add_user_info_text
@@ -54,7 +58,13 @@ __all__ = [
     "DualAccessDict",
     "interpolate_griddata",
     "get_dico_names",
+    "create_taiwan_land_mask",
+    "mask_taiwan_land",
+    "plot_lines",
+    "pln",
     "p2d",
+    "p2d_quick_save_kwargs",
+    "qs",
     "ari",
     "q2x",
     "auit",
