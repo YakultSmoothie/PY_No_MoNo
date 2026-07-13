@@ -35,12 +35,15 @@ from netCDF4 import Dataset
 import pandas as pd
 from scipy.interpolate import griddata  # 新增：用於網格插值
 
+SCRIPT_VERSION = "v1.7"
+SCRIPT_UPDATE_DATE = "2026-07-03"
+
 def parse_arguments():
     """解析命令列參數"""
     parser = argparse.ArgumentParser(
         description='從WRF輸出檔案中提取指定變數並轉存為NetCDF檔案（支援多變數與網格插值）',
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
+        epilog=f"""
 使用範例:
   # 分解多變數為單獨變數
   python extract_wrf_to_nc.py -i /path/to/wrf -o extract_wrf_vars_p -V z,uvmet -L 850 -T "2006-06-09_00:00:00" -E 1 --decompose_multi 
@@ -61,7 +64,7 @@ def parse_arguments():
   python extract_wrf_to_nc.py -i /path/to/wrf -V z,QVAPOR -L 850 -T "2006-06-09_00:00:00,2006-06-09_03:00:00" -E 1,2,3 --Emean --Tmean -LL 119,123,22,26,0.2 -o ensemble_time_mean_interp
 
 作者: CYC
-Update: 2026-06-22 [v1.5]
+Update: {SCRIPT_UPDATE_DATE} [{SCRIPT_VERSION}]
         """)
 
     # 必要參數
@@ -77,12 +80,18 @@ Update: 2026-06-22 [v1.5]
                        help='系集成員編號，以逗號分隔，例如: 1 或 1,2,3 (預設: 1)')
     parser.add_argument('-T', '--times', default=None,
                        help='時間點，以逗號分隔，格式: "YYYY-MM-DD_HH:MM:SS" (預設: 自動偵測第一個可用時間)')
-    parser.add_argument('-D', '--domain', default='d02',
-                       help='Domain名稱 (預設: d02)')
+    parser.add_argument('-D', '--domain', default='d01',
+                       help='Domain名稱 (預設: d01)')
     
     # 變數處理選項
     parser.add_argument('--decompose_multi', action='store_true',
                        help='將多分量變數分解為單獨的變數 (例如: uvmet -> uvmet_u, uvmet_v) (預設: False)')
+    parser.add_argument('--concat_coords', choices=['minimal', 'different', 'all'], default='minimal',
+                       help="xarray.concat 的 coords 合併方式，可選 minimal/different/all (預設: minimal)")
+    parser.add_argument('--concat_compat',
+                       choices=['auto', 'equals', 'identical', 'broadcast_equals', 'no_conflicts', 'override'],
+                       default='auto',
+                       help="xarray.concat 的 compat 檢查方式；auto 會在 coords=minimal/all 時使用 override，在 coords=different 時使用 equals (預設: auto)")
     
     # 網格插值參數
     parser.add_argument('-LL', '--lonlat_grid', default=None,
@@ -103,6 +112,13 @@ Update: 2026-06-22 [v1.5]
                        help='壓縮等級 0-9，0表示不壓縮 (預設: 0)')
 
     return parser.parse_args()
+
+def resolve_concat_compat(concat_coords, concat_compat):
+    if concat_compat != 'auto':
+        return concat_compat
+    if concat_coords == 'different':
+        return 'equals'
+    return 'override'
 
 def get_wrf_search_dir(base_dir, domain, ensemble_members):
     first_member = ensemble_members[0]
@@ -1741,11 +1757,12 @@ def interpolate_to_regular_grid(dataset, ll_params):
     except Exception as e:
         print(f"    Error during interpolation: {str(e)}")
 
-def wrfdata_sel_optimized(I, D, L, T, E, V_list, decompose_multi=False):
+def wrfdata_sel_optimized(I, D, L, T, E, V_list, decompose_multi=False, concat_coords='minimal', concat_compat='auto'):
     """
     優化版本：使用 MTV (Member-Time-Variable) 迴圈結構
     減少檔案 I/O 操作次數以提升性能
     """
+    concat_compat = resolve_concat_compat(concat_coords, concat_compat)
     
     print(f"\nWRF multi-variable data extraction (OPTIMIZED MTV structure):")
     print(f"    Base directory: {I}")
@@ -1754,6 +1771,8 @@ def wrfdata_sel_optimized(I, D, L, T, E, V_list, decompose_multi=False):
     print(f"    Time points: {len(T)} times")
     print(f"    Ensemble members: {E} ({len(E)} members)")
     print(f"    Variables: {V_list} ({len(V_list)} variables)")
+    print(f"    xarray.concat coords: {concat_coords}")
+    print(f"    xarray.concat compat: {concat_compat}")
     print(f"    Expected file operations: {len(E) * len(T)} files (vs {len(E) * len(V_list) * len(T)} in old version)")
 
     # 驗證基礎目錄
@@ -1869,7 +1888,7 @@ def wrfdata_sel_optimized(I, D, L, T, E, V_list, decompose_multi=False):
                                         component_interp = component_interp.expand_dims(component_dim)
                                         component_list.append(component_interp)
                                     
-                                    var_interp = xr.concat(component_list, dim=component_dim)
+                                    var_interp = xr.concat(component_list, dim=component_dim, coords=concat_coords, compat=concat_compat)
                                     
                                     if component_dim == 'u_v':
                                         var_interp = var_interp.assign_coords({component_dim: ['u', 'v']})
@@ -1945,7 +1964,7 @@ def wrfdata_sel_optimized(I, D, L, T, E, V_list, decompose_multi=False):
             for var_name in member_variables_data:
                 if member_variables_data[var_name]:  # 確保該變數有數據
                     # 沿時間維度合併
-                    var_combined = xr.concat(member_variables_data[var_name], dim='Time')
+                    var_combined = xr.concat(member_variables_data[var_name], dim='Time', coords=concat_coords, compat=concat_compat)
                     
                     # 添加成員維度
                     var_combined = var_combined.expand_dims('member')
@@ -1976,7 +1995,7 @@ def wrfdata_sel_optimized(I, D, L, T, E, V_list, decompose_multi=False):
     
     for var_name in all_variables_data:
         if all_variables_data[var_name]:
-            var_combined = xr.concat(all_variables_data[var_name], dim='member')
+            var_combined = xr.concat(all_variables_data[var_name], dim='member', coords=concat_coords, compat=concat_compat)
             var_combined = var_combined.assign_coords(member=successful_members)
             final_dataset_dict[var_name] = var_combined
 
@@ -2029,7 +2048,7 @@ def main():
             print(f"    Using first available time: {times[0]}")
         else:
             times = [t.strip().strip('"') for t in args.times.split(',')]
-        
+
         # -----------------
         # 提取WRF數據
         # -----------------
@@ -2045,7 +2064,9 @@ def main():
             T=times,
             E=ensemble_members,
             V_list=variables,
-            decompose_multi=args.decompose_multi
+            decompose_multi=args.decompose_multi,
+            concat_coords=args.concat_coords,
+            concat_compat=args.concat_compat
         )
 
         # -----------------

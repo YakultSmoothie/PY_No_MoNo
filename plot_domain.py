@@ -4,17 +4,19 @@ import os
 import re
 import numpy as np
 import xarray as xr
-import matplotlib.pyplot as plt
 import matplotlib.patheffects as path_effects
 from netCDF4 import Dataset
-from wrf import getvar, interpline, CoordPair, xy_to_ll, ll_to_xy
+from wrf import ll_to_xy
 
 import definitions as mydef
 from definitions.plot_2D_shaded import plot_2D_shaded as p2d
 
 # ======================================================================================================
 
-def extract_boundary_points(da):
+PROGRAM_UPDATED_AT = "2026-07-01"
+
+
+def _extract_boundary_points(da):
     """提取 2D DataArray 的四個邊界值（順時針方向：下 -> 左 -> 上 -> 右）"""
     bottom = da[0, :]
     left = da[:, 0]
@@ -26,59 +28,133 @@ def extract_boundary_points(da):
     )
     return boundary_pts.tolist()
 
-def plot_domains(inputs, cints_val):
-    """
-    處理 WRF geo_em 檔案，提取地形與邊界，並進行繪圖邏輯。
-    接收 inputs (檔案列表) 與 cints_val (控制間隔的數值)。
-    """
-    print("\n--- 開始處理資料與繪圖流程 ---")
-    
-    bdy_lons = {}
-    bdy_lats = {}
-    d01_hgt = None
-    d01_lons = None
-    d01_lats = None
-    d01_land = None
-    d01_ncfile = None
 
-    domain_pattern = re.compile(r"geo_em\.(d\d+)\.nc")
+def _parse_domain_id(filename):
+    """從 geo_em.d01.nc 或 wrfinput_d01 類型檔名取得 d01/d02/..."""
+    patterns = (
+        re.compile(r"geo_em\.(d\d+)\.nc$"),
+        re.compile(r"wrfinput_(d\d+)(?:\.nc)?$"),
+    )
+
+    for pattern in patterns:
+        match = pattern.search(filename)
+        if match:
+            return match.group(1)
+
+    return None
+
+
+def _load_2d_var(ds, candidates):
+    """讀取第一個存在的 2D 變數，並移除 Time 等長度為 1 的維度。"""
+    for name in candidates:
+        if name in ds:
+            return ds[name].squeeze(drop=True).load()
+
+    raise KeyError(f"找不到必要變數，候選清單: {', '.join(candidates)}")
+
+
+def _format_attr(ds, name):
+    """格式化 NetCDF global attribute，缺值時回傳 '-'。"""
+    value = ds.attrs.get(name, "-")
+    if hasattr(value, "item"):
+        value = value.item()
+
+    return value
+
+
+def _print_geo_info(ds, lons, lats):
+    """顯示目前網格的基本地理資訊。"""
+    ny, nx = lons.shape
+    lon_min = float(lons.min().item())
+    lon_max = float(lons.max().item())
+    lat_min = float(lats.min().item())
+    lat_max = float(lats.max().item())
+
+    print(f"    grid: nx={nx}, ny={ny}")
+    print(f"    lon/lat: lon={lon_min:.3f} to {lon_max:.3f}, lat={lat_min:.3f} to {lat_max:.3f}")
+    print(
+        "    center/resolution: "
+        f"CEN_LON={_format_attr(ds, 'CEN_LON')}, "
+        f"CEN_LAT={_format_attr(ds, 'CEN_LAT')}, "
+        f"DX={_format_attr(ds, 'DX')}, "
+        f"DY={_format_attr(ds, 'DY')}"
+    )
+    print(
+        "    parent: "
+        f"GRID_ID={_format_attr(ds, 'GRID_ID')}, "
+        f"PARENT_ID={_format_attr(ds, 'PARENT_ID')}, "
+        f"I_PARENT_START={_format_attr(ds, 'I_PARENT_START')}, "
+        f"J_PARENT_START={_format_attr(ds, 'J_PARENT_START')}, "
+        f"PARENT_GRID_RATIO={_format_attr(ds, 'PARENT_GRID_RATIO')}"
+    )
+
+
+def _load_and_data(inputs):
+    """
+    處理 WRF geo_em/wrfinput 檔案，提取 d01 地形與各子網格邊界。
+    """
+    print("\n--- 開始讀取資料 ---")
+
+    data = {
+        "d01": None,
+        "d01_path": None,
+        "boundaries": {},
+    }
 
     for file_path in inputs:
         filename = os.path.basename(file_path)
-        match = domain_pattern.search(filename)
+        dom_id = _parse_domain_id(filename)
 
-        if not match:
-            print(f"警告: 檔案名稱 {filename} 不符合 geo_em.d0X.nc 格式，跳過處理。")
+        if dom_id is None:
+            print(f"警告: 檔案名稱 {filename} 不符合 geo_em.d0X.nc 或 wrfinput_d0X 格式，跳過處理。")
             continue
 
-        dom_id = match.group(1)
         print(f"正在處理檔案: {filename} ({dom_id})")
 
         with xr.open_dataset(file_path) as ds:
-            ds_compat = ds.squeeze()
-
             if dom_id == "d01":
-                if "HGT_M" in ds_compat:
-                    d01_hgt = ds_compat["HGT_M"]
-                    d01_lons = ds_compat["XLONG_M"]
-                    d01_lats = ds_compat["XLAT_M"]
-                    d01_land = ds_compat["LANDMASK"]
-                    d01_ncfile = Dataset(file_path)
+                hgt = _load_2d_var(ds, ("HGT_M", "HGT"))
+                lons = _load_2d_var(ds, ("XLONG_M", "XLONG"))
+                lats = _load_2d_var(ds, ("XLAT_M", "XLAT"))
+                land = _load_2d_var(ds, ("LANDMASK",))
 
-                    # 若經度小於 0，則加上 360；否則保持原值
-                    d01_lons = xr.where(d01_lons < 0, d01_lons + 360, d01_lons)
-                    
-                else:
-                    raise KeyError("在 d01 檔案中找不到 HGT_M 變數！")
+                # 若經度小於 0，則加上 360；否則保持原值
+                lons = xr.where(lons < 0, lons + 360, lons)
+
+                data["d01"] = {
+                    "hgt": hgt,
+                    "lons": lons,
+                    "lats": lats,
+                    "land": land,
+                }
+                data["d01_path"] = file_path
+                _print_geo_info(ds, lons, lats)
             else:
-                if "XLONG_M" in ds_compat and "XLAT_M" in ds_compat:
-                    lon_da = ds_compat["XLONG_M"]
-                    lat_da = ds_compat["XLAT_M"]
-                    bdy_lons[dom_id] = extract_boundary_points(lon_da)
-                    bdy_lats[dom_id] = extract_boundary_points(lat_da)
+                lon_da = _load_2d_var(ds, ("XLONG_M", "XLONG"))
+                lat_da = _load_2d_var(ds, ("XLAT_M", "XLAT"))
+                _print_geo_info(ds, lon_da, lat_da)
+                # 提取 2D DataArray 的四個邊界值
+                data["boundaries"][dom_id] = {
+                    "lons": _extract_boundary_points(lon_da),
+                    "lats": _extract_boundary_points(lat_da),
+                }
 
-    if d01_hgt is None:
+    if data["d01"] is None:
         raise ValueError("錯誤: 未輸入 d01 檔案！")
+
+    return data
+
+
+def _plot_domains(data, cints_val):
+    """
+    使用已讀取的 d01 地形與子網格邊界進行繪圖。
+    """
+    print("\n--- 開始繪圖流程 ---")
+
+    d01_hgt = data["d01"]["hgt"]
+    d01_lons = data["d01"]["lons"]
+    d01_lats = data["d01"]["lats"]
+    d01_land = data["d01"]["land"]
 
     # 計算 figsize
     long = 7.0
@@ -109,22 +185,39 @@ def plot_domains(inputs, cints_val):
     fig = result['fig']
     ax = result['ax']
 
-    for dom in bdy_lons.keys():
-        bdy_xs, bdy_ys = ll_to_xy(d01_ncfile, bdy_lats[dom], bdy_lons[dom])
-        ax.plot(bdy_xs, bdy_ys, color='red', linestyle='-', linewidth=1.5, zorder=200)
+    ax.text(0.98, 0.98, "d01", color='red', fontsize=10, fontweight='bold',
+            ha='right', va='top', transform=ax.transAxes, zorder=201,
+            path_effects=[path_effects.withStroke(linewidth=1, foreground='black')])
 
-        max_x = bdy_xs.max().item()
-        max_y = bdy_ys.max().item()
-        ax.text(max_x + 1, max_y + 1, dom, color='red', fontsize=10, fontweight='bold', 
-                ha='left', va='bottom', zorder=201,
-                path_effects=[path_effects.withStroke(linewidth=1, foreground='black')])
+    d01_ncfile = Dataset(data["d01_path"])
+    try:
+        for dom, boundary in data["boundaries"].items():
+            bdy_xs, bdy_ys = ll_to_xy(d01_ncfile, boundary["lats"], boundary["lons"])
+            ax.plot(bdy_xs, bdy_ys, color='red', linestyle='-', linewidth=1.5, zorder=200)
+
+            min_x = bdy_xs.min().item()
+            max_x = bdy_xs.max().item()
+            min_y = bdy_ys.min().item()
+            max_y = bdy_ys.max().item()
+
+            label_x = max_x - (max_x - min_x) * 0.02
+            label_y = max_y - (max_y - min_y) * 0.02
+            # print(max_x, max_y)
+            ax.text(label_x, label_y, dom, color='red', fontsize=10, fontweight='bold',
+                    ha='right', va='top', zorder=201,
+                    path_effects=[path_effects.withStroke(linewidth=1, foreground='black')])
+    finally:
+        d01_ncfile.close()
 
     return fig, ax
 
 # ======================================================================================================
 def main():
-    parser = argparse.ArgumentParser(description="處理 WRF geo_em.nc 檔案並抓出地形與子網格邊界。")
-    parser.add_argument("-i", "--inputs", nargs="+", required=True, help="輸入一個或多個 geo_em.d0X.nc 檔案")
+    parser = argparse.ArgumentParser(
+        description="處理 WRF geo_em/wrfinput 檔案並抓出地形與子網格邊界。",
+        epilog=f"更新日期: {PROGRAM_UPDATED_AT}",
+    )
+    parser.add_argument("-i", "--inputs", nargs="+", required=True, help="輸入一個或多個 geo_em.d0X.nc 或 wrfinput_d0X 檔案")
     parser.add_argument("-o", "--output", default="./plot_domain_output.png", help="輸出路徑/檔名")
     parser.add_argument("-c", "--cints", type=float, default=10.0, help="設定經緯度等值線的間隔 (預設: 10.0)")
     # -----------------
@@ -132,8 +225,11 @@ def main():
     # 解析參數
     args = parser.parse_args()
 
-    # 將 args.cints 傳入函式
-    fig, ax = plot_domains(args.inputs, args.cints)
+    # load and define
+    data = _load_and_data(args.inputs)
+
+    # plot
+    fig, ax = _plot_domains(data, args.cints)
     
     # save
     mydef.f2p(figure=fig, out=args.output)    

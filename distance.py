@@ -5,6 +5,7 @@
 # Input: lon1 lat1 lon2 lat2, optional elapsed hours for speed.
 # Output: Distance (km), optional speed (m/s), direction and u/v speed.
 # Created: 2026-05-29
+# Updated: 2026-06-22
 # Run Sample:
 #   python3 distance.py 120 23 121 24
 #   python3 distance.py 120 23 121 24 -t 6
@@ -148,8 +149,12 @@ Notes:
   lat range: -90 <= lat <= 90
   -t dhrs: elapsed hours, must be > 0 when provided;
            output speed, moving direction, u speed and v speed
-  direction default: estimate from dlon/dlat
-  --xy-direction: estimate direction from local x-y distance
+  direction (dlon/dlat): atan2(lat2-lat1, shortest lon2-lon1)
+                         (E = 0, NE = 45, N = 90, NW = 135,
+                          W = 180, SW = 225, S = 270, SE = 315 degree)
+  direction (local x-y): atan2(dy, dx), where dx and dy are local
+                         distance components at the mean latitude.
+                         Both direction methods are used to calculate and output u/v speed.
         """,
     )
 
@@ -180,14 +185,9 @@ Notes:
         help="Decimal places for printed numeric values (default: 6)",
     )
     parser.add_argument(
-        "--xy-direction",
-        action="store_true",
-        help="Estimate moving direction from local x-y distance instead of dlon/dlat",
-    )
-    parser.add_argument(
         "--version",
         action="version",
-        version="distance.py v0.1",
+        version="distance.py v0.2",
     )
 
     return parser
@@ -227,28 +227,41 @@ def main(argv=None):
 
     if args.time_hours is not None:
         speed_ms = distance_km * 1000.0 / (args.time_hours * 3600.0)
-        if args.xy_direction:
-            direction_deg = movement_direction_xy(
-                args.lon1,
-                args.lat1,
-                args.lon2,
-                args.lat2,
-                radius_km=args.radius,
-            )
-        else:
-            direction_deg = movement_direction_dlon_dlat(
-                args.lon1,
-                args.lat1,
-                args.lon2,
-                args.lat2,
-            )
-        direction_rad = math.radians(direction_deg)
-        u_speed_ms = speed_ms * math.cos(direction_rad)
-        v_speed_ms = speed_ms * math.sin(direction_rad)
+        direction_dlon_dlat_deg = movement_direction_dlon_dlat(
+            args.lon1,
+            args.lat1,
+            args.lon2,
+            args.lat2,
+        )
+        direction_xy_deg = movement_direction_xy(
+            args.lon1,
+            args.lat1,
+            args.lon2,
+            args.lat2,
+            radius_km=args.radius,
+        )
+        direction_dlon_dlat_rad = math.radians(direction_dlon_dlat_deg)
+        direction_xy_rad = math.radians(direction_xy_deg)
+        u_dlon_dlat_ms = speed_ms * math.cos(direction_dlon_dlat_rad)
+        v_dlon_dlat_ms = speed_ms * math.sin(direction_dlon_dlat_rad)
+        u_xy_ms = speed_ms * math.cos(direction_xy_rad)
+        v_xy_ms = speed_ms * math.sin(direction_xy_rad)
         print(f"V(m/s) = {fmt.format(speed_ms)}")
-        print(f"MoveDir(deg) = {fmt.format(direction_deg)}")
-        print(f"u(m/s) = {fmt.format(u_speed_ms)}")
-        print(f"v(m/s) = {fmt.format(v_speed_ms)}")
+        print(
+            "MoveDir(deg) = "
+            f"{fmt.format(direction_dlon_dlat_deg)} (dlon/dlat); "
+            f"{fmt.format(direction_xy_deg)} (local x-y)"
+        )
+        print(
+            "u(m/s) = "
+            f"{fmt.format(u_dlon_dlat_ms)} (dlon/dlat); "
+            f"{fmt.format(u_xy_ms)} (local x-y)"
+        )
+        print(
+            "v(m/s) = "
+            f"{fmt.format(v_dlon_dlat_ms)} (dlon/dlat); "
+            f"{fmt.format(v_xy_ms)} (local x-y)"
+        )
 
     return 0
 
