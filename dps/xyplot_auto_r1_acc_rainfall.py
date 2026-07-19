@@ -223,8 +223,8 @@ def xyplot_auto_r1_acc_rainfall(
         colorbar_shrink_bai=0.8,
         colorbar_label="[mm]",
 
-        # coastline_resolution="10m",
-        # grid_int=(1, 1),
+        coastline_resolution="10m",
+        grid_int=(1, 1),
 
         **map_config,
         **plot_config,

@@ -38,6 +38,7 @@ def _plot_acc_rainfall_map(
     }
 
     # draw main x-y plot
+    print(" ")
     result = p2d(
         title=f"{run_name}",
         title_loc='center',
@@ -50,6 +51,7 @@ def _plot_acc_rainfall_map(
         **plot_config,
         **xy_config,
 
+        silent=True,
         figsize=(5, 5),
         ax=ax,
         fig=fig,
@@ -87,7 +89,7 @@ def _plot_acc_rainfall_map(
 
     mydef.add_system_time(
         fig=result['fig'],
-        system_time_info=None,
+        system_time_info=f"run: {run_name}",
     )
 
     # draw a mark on the location of max value
@@ -111,7 +113,7 @@ def xyplot_260513_acc_rainfall(
     end_time, 
     map_config, 
     output_root=".", 
-    run_name='.', 
+    run_name='WRFrain', 
     ax=None, 
     fig=None, 
     dim_name_mean=None, 
@@ -134,7 +136,7 @@ def xyplot_260513_acc_rainfall(
     output_root : str, optional
         Root directory for output figures. Default is ".".
     run_name : str, optional
-        Name used in the plot title and output subdirectory. Default is ".".
+        Name used in the plot title and output subdirectory. Default is "run_name".
     ax : matplotlib.axes.Axes, optional
         Existing axes for plotting. Default is None.
     fig : matplotlib.figure.Figure, optional
@@ -153,45 +155,53 @@ def xyplot_260513_acc_rainfall(
     print("\n" + "="*60)
     print(f"[START] xyplot_260513_acc_rainfall : {run_name}")
     print("="*60)
-    print(f"delta_T   = {delta_T}")
-    print(f"end_time  = {end_time}")
-    print(f"output_root = {output_root}")
-    print(f"dim_name_mean = {dim_name_mean}")
-    print(f"do_not_plot = {do_not_plot}")
+    print(f"    end_time  = {end_time}")
+    print(f"    delta_T   = {delta_T}")
+    print(f"    output_root = {output_root}")
+    print(f"    dim_name_mean = {dim_name_mean}")
+    print(f"    do_not_plot = {do_not_plot}")
     print("[INFO] input dataset info")
-    print(f"dataset type = {type(ds).__name__}")
-    print(f"dataset sizes = {dict(ds.sizes)}")
-    print(f"dataset coords = {list(ds.coords)}")
-    print(f"dataset data_vars = {list(ds.data_vars)}")
+    print(f"    dataset type = {type(ds).__name__}")
+    print(f"    dataset sizes = {dict(ds.sizes)}")
+    print(f"    dataset coords = {list(ds.coords)}")
+    print(f"    dataset data_vars = {list(ds.data_vars)}")
 
     # 空間選取
     spatial_mask = mydef.get_spatial_mask(ds.XLONG, ds.XLAT, map_config['gxylim'])
 
-    # ----------- define ----------- 
-    data= (ds['RAINNC'] + ds['RAINC']).isel(west_east=spatial_mask['x_slice'], south_north=spatial_mask['y_slice'])
+    # 計算累積雨量的起訖時間
+    end_time = pd.to_datetime(end_time)
+    start_time = end_time - pd.Timedelta(hours=delta_T)
+    spatial_indexer = {
+        'west_east': spatial_mask['x_slice'],
+        'south_north': spatial_mask['y_slice'],
+    }
+
+    # 僅選取起訖時間與指定空間範圍，再計算各時間點的累積雨量
+    rain_end = (
+        ds['RAINNC'].sel(Time=end_time).isel(**spatial_indexer)
+        + ds['RAINC'].sel(Time=end_time).isel(**spatial_indexer)
+    )
+    rain_start = (
+        ds['RAINNC'].sel(Time=start_time).isel(**spatial_indexer)
+        + ds['RAINC'].sel(Time=start_time).isel(**spatial_indexer)
+    )
 
     # 當指定 dim_name_mean 時，印出維度名稱與大小
     if dim_name_mean is not None:
-        if dim_name_mean in data.dims:
-            dim_size = data.sizes[dim_name_mean]
+        if dim_name_mean in rain_end.dims:
+            dim_size = rain_end.sizes[dim_name_mean]
             print(f"[平均提示] 正在對維度 '{dim_name_mean}' 求平均，該維度大小（成員數）為: {dim_size}")
-            data = data.mean(dim=dim_name_mean)  # 只有維度存在才計算平均
+            rain_end = rain_end.mean(dim=dim_name_mean)
+            rain_start = rain_start.mean(dim=dim_name_mean)
         else:
             # 拋出錯誤，程式會在這裡直接中斷跳出
             raise ValueError(f"--> [錯誤] 指定的維度 '{dim_name_mean}' 不在資料中，無法計算平均！請檢查輸入資料。")
-    
-    # 計算累積雨量
-    # rain_acc = data - data.reindex(Time=data.Time - pd.Timedelta(hours=delta_T), method=None).assign_coords(Time=data.Time)
-    end_time = pd.to_datetime(end_time)
-    start_time = end_time - pd.Timedelta(hours=delta_T)
 
-    data_end = data.sel(Time=end_time)
-    data_start = data.sel(Time=start_time)
     # breakpoint()
 
     # 找最大值位置
-    # shd = rain_acc.sel(Time=end_time).squeeze(drop=True)
-    shd = (data_end - data_start).squeeze(drop=True)
+    shd = (rain_end - rain_start).squeeze(drop=True)
     max_shd = np.nanmax(shd.values)
     max_idx = np.nanargmax(shd.values)
     iy, ix = np.unravel_index(max_idx, shd.shape)
@@ -219,7 +229,7 @@ def xyplot_260513_acc_rainfall(
     # ----------- plot -----------
     result = _plot_acc_rainfall_map(
         shd=shd,
-        data=data,
+        data=shd,
         map_config=map_config,
         mycmap_str=mycmap_str,
         run_name=run_name,
