@@ -1,6 +1,6 @@
 # PY_No_MoNo definitions 程式總表
 
-更新日期：2026-07-13  |  README.md編輯：Codex（GPT-5.5）
+更新日期：2026-07-18  |  README.md編輯：Codex（GPT-5.6 sol）
 
 ## 繪圖與地圖
 
@@ -28,6 +28,8 @@
 | [geo_to_proj_coords.py](geo_to_proj_coords.py) | 將經緯度座標轉換為指定 Cartopy 投影座標。 |
 | [interpolate_griddata.py](interpolate_griddata.py) | 使用 `scipy.interpolate.griddata` 將資料內插到目標經緯度網格。 |
 | [taiwan_land_mask.py](taiwan_land_mask.py) | 使用 `regionmask` 建立台灣陸地遮罩，支援以 `expand_grid` 外擴或內縮遮罩，並將台灣陸地以外的資料改為 `np.nan`。 |
+| [get_distance_path.py](get_distance_path.py) | 建立指定中心與球面距離的經緯度路徑，回傳路徑經緯座標。 |
+| [mask_lon_lat_by_path.py](mask_lon_lat_by_path.py) | 依封閉經緯度路徑選取內部或外部的二維經緯度網格，並支援跨經度接縫。 |
 
 ## 資料與座標資訊
 

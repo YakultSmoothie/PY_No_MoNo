@@ -25,6 +25,8 @@ from .interpolate_griddata import *
 from .get_dico_names import *
 from .taiwan_land_mask import *
 from .plot_lines import *
+from .get_distance_path import *
+from .mask_lon_lat_by_path import *
 
 # 常用別名
 p2d = plot_2D_shaded
@@ -61,6 +63,8 @@ __all__ = [
     "create_taiwan_land_mask",
     "mask_taiwan_land",
     "plot_lines",
+    "get_distance_path",
+    "mask_lon_lat_by_path",
     "pln",
     "p2d",
     "p2d_quick_save_kwargs",

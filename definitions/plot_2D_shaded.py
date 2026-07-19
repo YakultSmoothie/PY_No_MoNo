@@ -248,6 +248,7 @@ def p2d_quick_save_kwargs(
     add_out_time_dash=True,
     system_time=True,
     if_exists="number",
+    silent=True,
     **overrides,
 ):
     """
@@ -265,6 +266,7 @@ def p2d_quick_save_kwargs(
         "add_out_time_dash": add_out_time_dash,
         "system_time": system_time,
         "if_exists": if_exists,
+        "silent": silent,
     }
     qs.update(overrides)
     return qs
@@ -2439,7 +2441,7 @@ def plot_2D_shaded(array, x=None, y=None,
         print(f'{ind2}show: False')
 
     if silent:
-        builtins.print(f"{ind}p2d (")
+        builtins.print(f"{ind}p2d(")
         builtins.print(f"{ind2}title: {title}")
         builtins.print(f"{ind2}shape: {array.shape}")
         builtins.print(_format_summary_stats("shd", stats))

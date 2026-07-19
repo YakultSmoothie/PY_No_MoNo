@@ -277,7 +277,7 @@ def plot_lines(
     labels = _expand_line_option(label, n_lines, "label")
     zorders = _expand_line_option(line_zorder, n_lines, "line_zorder")
 
-    print("pln (")
+    print("pln(")
     print(f"    title: {title}")
 
     if verbose:
