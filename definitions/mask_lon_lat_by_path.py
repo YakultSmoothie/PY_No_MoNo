@@ -196,6 +196,7 @@ def mask_lon_lat_by_path(
         f"pole: {enclosed_pole} | "
         f"plon: ({np.min(path_lon_values):.2f} ~ {np.max(path_lon_values):.2f}) | "
         f"plat: ({np.min(path_lat_values):.2f} ~ {np.max(path_lat_values):.2f}) | "
+        f"points: {path_lon_values.size} | "
         f"selected: {selected_count}/{mask.size} ({selected_percent:.2f}%)"
     )
 

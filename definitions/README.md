@@ -1,6 +1,6 @@
 # PY_No_MoNo definitions 程式總表
 
-更新日期：2026-07-18  |  README.md編輯：Codex（GPT-5.6 sol）
+更新日期：2026-07-22  |  README.md編輯：Codex（GPT-5）
 
 ## 繪圖與地圖
 
@@ -40,6 +40,7 @@
 | [get_grid_info.py](get_grid_info.py) | 回傳各資料類型的 x、y、時間維度及經緯度座標名稱。 |
 | [load_w2nc_layers.py](load_w2nc_layers.py) | 讀取 w2nc 分層資料並合併為 Dataset，可回傳載入資訊。 |
 | [load_wrfinput_info.py](load_wrfinput_info.py) | 讀取指定 WRF domain 的地形、陸海遮罩、投影、解析度與經緯度資訊。 |
+| [nlon.py](nlon.py) | 將經度正規化至以 `lower` 指定的 360 度半開區間，預設為 `[0, 360)`。 |
 
 ## 統計分析
 
