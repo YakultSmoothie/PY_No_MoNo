@@ -1,11 +1,18 @@
 # PY_No_MoNo dps 程式總表
 
-更新日期：2026-07-06  |  README.md編輯：Codex（GPT-5）
+更新日期：2026-07-30  |  README.md編輯：Codex（GPT-5）
 
-## 降雨繪圖
+## 資料載入
 
 | 程式名 | 簡單說明 |
 |---|---|
+| [load_w2nc_alpha.py](load_w2nc_alpha.py) | 提供 `load_w2nc_alpha()`，讀取多組 `a_X.X` SST sensitivity w2nc 檔案，檢查固定五維及跨 alpha 相容性，合併為具有 `alpha` 維度的 Dataset。 |
+
+## 降雨計算與繪圖
+
+| 程式名 | 簡單說明 |
+|---|---|
+| [define_260730_WRF_R1R6.py](define_260730_WRF_R1R6.py) | 由 WRF 的 `RAINC`、`RAINNC` 任一或兩者通用計算 R1 與 R6，並保留輸入資料集的維度與座標。 |
 | [xyplot_260513_acc_rainfall.py](xyplot_260513_acc_rainfall.py) | 由 WRF 的 `RAINNC`、`RAINC` 繪製指定時段累積雨量分布圖，可先對指定維度取平均。 |
 | [xyplot_auto_r1_acc_rainfall.py](xyplot_auto_r1_acc_rainfall.py) | 由 auto_r1 時雨量資料加總指定時間窗，繪製累積雨量分布圖。 |
 | [ts_260515_rainfall.py](ts_260515_rainfall.py) | 計算指定區域陸地平均的 1 小時、6 小時雨量，並繪製 6 小時雨量時間序列。 |
@@ -20,7 +27,7 @@
 
 | 程式名 | 簡單說明 |
 |---|---|
-| [__init__.py](__init__.py) | 匯出累積雨量圖、auto_r1 累積雨量圖、雨量時間序列與 SST 圖函式，可用 `import dps` 匯入。 |
+| [__init__.py](__init__.py) | 匯出多 alpha w2nc 載入、R1/R6 計算、累積雨量圖、auto_r1 累積雨量圖、雨量時間序列與 SST 圖函式，可用 `import dps` 匯入。 |
 
 ## 備註
 
