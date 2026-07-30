@@ -17,6 +17,7 @@ def get_spatial_mask(
     lats: Union[NDArray[np.floating], xr.DataArray],
     extent: Union[Tuple[float, float, float, float], Literal['all']],
     expand_grid: int = 1,
+    silent: bool = False,
 ) -> DualAccessDict:
     """
     根據經緯度範圍獲取空間遮罩和索引切片
@@ -39,6 +40,8 @@ def get_spatial_mask(
         在精確符合 extent 的索引範圍外，額外調整的網格格數。
         預設為 1，維持舊版「向外延伸一格」的行為；設為 0 則不額外延伸；
         設為負整數時會向內縮小矩形切片範圍。
+    silent : bool, default=False
+        是否關閉函式執行與警告訊息。預設保留既有輸出行為。
     
     Returns
     -------
@@ -85,6 +88,8 @@ def get_spatial_mask(
     
     Version History
     ---------------
+    v1.5 2026-07-28 YakultSmoothie and Codex
+        新增 silent 參數，可選擇關閉函式執行與警告訊息
     v1.4 2026-06-12 YakultSmoothie and Codex
         新增 expand_grid 參數，可調整外擴/內縮的網格格數，預設維持外擴 1 格
     v1.3 2026-03-13 YakultSmoothie and Gemini
@@ -100,7 +105,11 @@ def get_spatial_mask(
         初始版本,支援1D/2D輸入、單位處理、自動擴充
     """
     
-    print(f"get_spatial_mask running, extent={extent} ...")
+    if not isinstance(silent, (bool, np.bool_)):
+        raise ValueError("silent 必須是布林值")
+
+    if not silent:
+        print(f"[get_spatial_mask] extent={extent} ...")
 
     if not isinstance(expand_grid, (int, np.integer)):
         raise ValueError("expand_grid 必須是整數")
@@ -147,7 +156,8 @@ def get_spatial_mask(
             y_start = max(0, int(y_indices_raw[0]) - expand_grid)
             y_end = min(lats_2d.shape[0] - 1, int(y_indices_raw[-1]) + expand_grid)
         else:
-            print(f"    警告: 目標區域沒有符合的網格點!")
+            if not silent:
+                print(f"    警告: 目標區域沒有符合的網格點!")
             empty_mask = np.zeros_like(strict_mask, dtype=bool)
             # 保持一致的字典順序回傳
             return DualAccessDict({

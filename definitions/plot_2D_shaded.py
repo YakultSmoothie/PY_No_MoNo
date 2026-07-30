@@ -971,8 +971,8 @@ def plot_2D_shaded(array, x=None, y=None,
             - None: 自動生成，預設每4條細線畫一次粗線
             - tuple: 單組等值線的levels設定
             - a list of tuples of two lists of contour levels: 多組等值線各自的levels設定. Note: 這是一個三層結構.
-            例如：clevels=[([990, 992, 994, ...], [990, 998, 1006, ...]), ([0, 1, 2, ...], [0, 5, 10, ...])]
-            例如：clevels=[([0], [0])]
+            例如（單組）：clevels=([0, 1, 2, ...], [0, 5, 10, ...])
+            例如（多組）：clevels=[([990, 992, 994, ...], [990, 998, 1006, ...]), ([0, 1, 2, ...], [0, 5, 10, ...])]
         cints (tuple or list of tuple): (細線間隔, 粗線間隔)，預設None
             當使用者只提供間隔而非完整levels時，自動計算等值線levels
             - tuple: 單組等值線的間隔，例如：(5, 20)表示細線每5畫一條，粗線每20畫一條
@@ -1066,6 +1066,7 @@ def plot_2D_shaded(array, x=None, y=None,
             例如：user_info_color='white', user_info_stroke_color='black'   
 
     == Update ==
+    v1.21.8 2026-07-29 修正單組clevels被誤判為多組等值線設定
     v1.21.7 2026-07-13 精簡 silent=True 輸出為 p2d 統計摘要
     v1.21.6 2026-07-06 增加 p2d_quick_save_kwargs 快速存檔參數字典 helper
     v1.21.5 2026-07-06 增加 add_out_time_dash 參數，可在輸出檔名加入 _YYMMDD-HHMMSS
@@ -2070,15 +2071,40 @@ def plot_2D_shaded(array, x=None, y=None,
             print(f"{ind2}    檢測到單組等值線")
         
         # 處理各等值線參數，統一轉換為列表格式
+        def _is_single_level_sequence(value):
+            """判斷 value 是否為單一細線或粗線使用的一維 levels 集合。"""
+            if value is None:
+                return True
+            if isinstance(value, np.ndarray):
+                return value.ndim <= 1
+            if not isinstance(value, (list, tuple)):
+                return False
+            return all(
+                item is not None
+                and not isinstance(item, (list, tuple, np.ndarray))
+                for item in value
+            )
+
         def _make_list(param, n, param_name):
             """將參數統一轉換為列表格式
             
             對於tuple/list類型的參數（如cwidth, clab），判斷其第一個元素是否為容器來區分單組/多組
+            clevels的單組設定本身包含兩個levels容器，需先辨識後再處理多組設定
             對於其他類型的參數（如czorder, ccolor），直接判斷列表長度
             """
             if param is None:
                 return [None] * n
             elif isinstance(param, (list, tuple)):
+                if (
+                    param_name == 'clevels'
+                    and len(param) == 2
+                    and all(
+                        _is_single_level_sequence(levels)
+                        for levels in param
+                    )
+                ):
+                    # 單組clevels格式：(細線levels, 粗線levels)
+                    return [param] * n
                 # 特殊處理：如果參數名稱表明是純數值或字串類型（如czorder, ccolor）
                 if param_name in ['czorder', 'ccolor']:
                     # 這些參數不會有嵌套結構

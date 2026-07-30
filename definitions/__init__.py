@@ -8,6 +8,7 @@ from .add_cross_section_milestones import *
 from .mycmap import *
 from .geo_to_proj_coords import *
 from .get_spatial_mask import *
+from .calculate_latitude_weighted_mean import *
 from .calculate_significance_mask_vectorized import *
 from .calculate_anomaly import *
 from .calculate_correlation import *
@@ -27,6 +28,8 @@ from .taiwan_land_mask import *
 from .plot_lines import *
 from .get_distance_path import *
 from .mask_lon_lat_by_path import *
+from .nlon import *
+from .make_analysis_key import make_analysis_key
 
 # 常用別名
 p2d = plot_2D_shaded
@@ -45,6 +48,7 @@ __all__ = [
     "mycmap",
     "geo_to_proj_coords",
     "get_spatial_mask",
+    "calculate_latitude_weighted_mean",
     "calculate_significance_mask_vectorized",
     "calculate_anomaly",
     "calculate_correlation",
@@ -65,6 +69,8 @@ __all__ = [
     "plot_lines",
     "get_distance_path",
     "mask_lon_lat_by_path",
+    "nlon",
+    "make_analysis_key",
     "pln",
     "p2d",
     "p2d_quick_save_kwargs",
