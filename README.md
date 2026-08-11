@@ -1,6 +1,6 @@
 # PY_No_MoNo 程式總表
 
-更新日期：2026-07-08  |  README.md編輯：Codex（GPT-5）
+更新日期：2026-08-10  |  README.md編輯：Codex（GPT-5）
 
 ## WRF／NetCDF 資料處理
 
@@ -16,6 +16,7 @@
 | [spatial_bandpass_filter.py](spatial_bandpass_filter.py) | 對 NetCDF 大氣變數進行空間高通、低通或帶通濾波。 |
 | [replace_met_sst_with_obs.py](replace_met_sst_with_obs.py) | 將 WPS `met_em` 檔中的海面 SST 以觀測 SST 內插後替換。 |
 | [wrf_modify_sst.py](wrf_modify_sst.py) | 調整 WRF WPS `met_em.nc` 檔案內的海表溫度。 |
+| [check_wrf_success.py](check_wrf_success.py) | 檢查各 member 的 `rsl.error.0000` 最後一行，統計 WRF 成功、執行中、未啟動與錯誤狀態。 |
 
 ## 繪圖與視覺化
 
@@ -24,8 +25,11 @@
 | [p2d_nc_browser.py](p2d_nc_browser.py) | 以命令列瀏覽 NetCDF 變數並繪製 2D 圖，可指定經緯度範圍、時間、層次與繪圖設定。 |
 | [plot_wrf_var.py](plot_wrf_var.py) | 讀取 WRF 輸出並繪製指定氣象變數、氣壓層或等值線圖。 |
 | [plot_var_LL.py](plot_var_LL.py) | 讀取 WRF 輸出並以經緯度座標設定繪製指定變數。 |
-| [plot_domain.py](plot_domain.py) | 讀取 WRF `geo_em.nc`，繪製地形與巢狀網格邊界。 |
+| [plot_domain.py](plot_domain.py) | 讀取 WRF `geo_em` 或 `wrfinput` 檔案，繪製地形、巢狀網格邊界與指定範圍框。 |
 | [plot_tc_tracks.py](plot_tc_tracks.py) | 讀取 IBTrACS 資料，繪製指定時間範圍內的颱風路徑。 |
+| [plot_OBS_rainfall.py](plot_OBS_rainfall.py) | 讀取 auto_r1 每小時觀測雨量，繪製指定時段的累積雨量圖。 |
+| [plot_WRF_rainfall.py](plot_WRF_rainfall.py) | 由 WRF NetCDF 繪製指定時段的系集累積雨量，並可輸出標準差、最大值與最小值等統計圖。 |
+| [plot_WRF_rainfall_diff.py](plot_WRF_rainfall_diff.py) | 計算兩組 WRF 指定時段的累積雨量並繪製差值，支援共同或個別時段設定。 |
 | [create_station_spatial_interpolation.py](create_station_spatial_interpolation.py) | 依測站觀測資料進行空間內插，支援多種內插法與批次時間處理。 |
 | [create_gif.py](create_gif.py) | 將指定圖檔合成 GIF 或 MP4，支援縮放與幀率設定。 |
 | [view_npy.py](view_npy.py) | 檢視 `.npy`、`.npz` 或 NetCDF 資料的內容、統計量與基本視覺化結果。 |
@@ -42,7 +46,7 @@
 | [generate_time10_list.py](generate_time10_list.py) | 依起訖時間與間隔產生 `time10` 格式的時間序列。 |
 | [generate_time12_list.py](generate_time12_list.py) | 依起訖時間與間隔產生 `time12` 格式的時間序列。 |
 
-## 財務與文字工具
+## 文字工具
 
 | 程式名 | 簡單說明 |
 |---|---|
@@ -54,9 +58,8 @@
 |---|---|
 | [information.py](information.py) | 測試用。提供簡單的資訊輸出與加法函式範例。 |
 | [myfunction.py](myfunction.py) | 測試用。提供簡單的資訊輸出與加法函式範例。 |
-| [00-github_download.sh](00-github_download.sh) | 從 GitHub 下載指定檔案；若同名檔已存在，會先建立時間戳記備份。 |
 
 ## 備註
 
-- 未列入 `.png` 圖檔、`__pycache__`，以及 `plot_wrf_var.py.v1.4.0`、`plot_wrf_var.py.v1.4.1` 等舊版備份檔。
-- `definitions` 與 `dps` 內的詳細程式說明，請分別參考各自的 README。
+- 未列入 `.png` 圖檔、`__pycache__`，以及 舊版備份檔。
+- `definitions`、`dps` 與 `examples` 內的詳細程式說明，請分別參考 [definitions/README.md](definitions/README.md)、[dps/README.md](dps/README.md) 與 [examples/README.md](examples/README.md)。

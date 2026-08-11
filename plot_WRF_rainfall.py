@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+from datetime import datetime, timedelta
 import re
 import sys
 from pathlib import Path
@@ -22,7 +23,10 @@ import dps
 def _parse_args():
     """集中處理命令列參數，避免 import 這支檔案時就直接執行主流程。"""
     parser = argparse.ArgumentParser(
-        description="Plot ensemble-mean accumulated rainfall from one NetCDF file."
+        description=(
+            "Plot ensemble-mean accumulated rainfall and optional ensemble "
+            "statistics from one NetCDF file."
+        )
     )
     parser.add_argument(
         "-i",
@@ -74,8 +78,42 @@ def _parse_args():
         default=None,
         help=(
             "Member names/values selected with .sel(member=...). "
-            "Example: -E 1 43 47. Use -E all to select all members."
+            'Example: -E 1 43 47. Use -E "all" to select all members.'
         ),
+    )
+    parser.add_argument(
+        "--plot-std",
+        dest="plot_std",
+        action="store_true",
+        help=(
+            "Plot standard deviation (std) along the member dimension "
+            "(default: False)."
+        ),
+    )
+    parser.add_argument(
+        "--plot-max",
+        action="store_true",
+        help="Plot member maximum accumulated rainfall (default: False).",
+    )
+    parser.add_argument(
+        "--plot-min",
+        action="store_true",
+        help="Plot member minimum accumulated rainfall (default: False).",
+    )
+    parser.add_argument(
+        "--plot-q1",
+        action="store_true",
+        help="Plot the first quartile along the member dimension (default: False).",
+    )
+    parser.add_argument(
+        "--plot-median",
+        action="store_true",
+        help="Plot the median along the member dimension (default: False).",
+    )
+    parser.add_argument(
+        "--plot-q3",
+        action="store_true",
+        help="Plot the third quartile along the member dimension (default: False).",
     )
     return parser.parse_args()
 
@@ -148,6 +186,126 @@ def _select_members(ds, member_names):
     return ds.sel(member=selected_values)
 
 
+def _format_datetime64_value(value):
+    """把 numpy.datetime64 轉成不含 nanosecond 整數的 ISO 字串。"""
+    label = str(value)
+    if "." in label:
+        label = label.split(".", 1)[0]
+    return label
+
+
+def _decode_cf_time_value(value, units):
+    """處理未被 xarray decode 的 CF-style time units。"""
+    match = re.match(r"^(\w+)\s+since\s+(.+)$", str(units).strip())
+    if not match:
+        return None
+
+    unit_name, base_time_text = match.groups()
+    unit_name = unit_name.lower()
+    if unit_name not in {"hour", "hours", "day", "days", "minute", "minutes", "second", "seconds"}:
+        return None
+
+    base_time_text = base_time_text.replace("T", " ")
+    try:
+        base_time = datetime.fromisoformat(base_time_text)
+    except ValueError:
+        return None
+
+    if hasattr(value, "item"):
+        try:
+            value = value.item()
+        except ValueError:
+            pass
+
+    if unit_name in {"hour", "hours"}:
+        delta = timedelta(hours=float(value))
+    elif unit_name in {"day", "days"}:
+        delta = timedelta(days=float(value))
+    elif unit_name in {"minute", "minutes"}:
+        delta = timedelta(minutes=float(value))
+    else:
+        delta = timedelta(seconds=float(value))
+
+    return (base_time + delta).isoformat()
+
+
+def _format_coord_value(value, units=None):
+    """把 xarray/numpy/pandas/cftime 座標值轉成簡短可讀字串。"""
+    if str(getattr(value, "dtype", "")).startswith("datetime64"):
+        return _format_datetime64_value(value)
+
+    if units:
+        decoded_value = _decode_cf_time_value(value, units)
+        if decoded_value is not None:
+            return decoded_value
+
+    if hasattr(value, "item"):
+        try:
+            value = value.item()
+        except ValueError:
+            pass
+
+    return str(value)
+
+
+def _format_coord_range(ds, coord_name):
+    """回傳指定維度或座標的範圍；沒有座標值時回報 index 範圍。"""
+    if coord_name in ds.coords:
+        coord = ds.coords[coord_name]
+        size = coord.size
+        if size == 0:
+            return "empty"
+
+        values = coord.values
+        if hasattr(values, "flat"):
+            first_value = values.flat[0]
+            last_value = values.flat[-1]
+        else:
+            first_value = values
+            last_value = values
+
+        units = coord.attrs.get("units")
+        first_label = _format_coord_value(first_value, units=units)
+        last_label = _format_coord_value(last_value, units=units)
+        if size == 1:
+            return f"{first_label} (count={size})"
+        return f"{first_label} -> {last_label} (count={size})"
+
+    if coord_name in ds.sizes:
+        size = ds.sizes[coord_name]
+        if size == 0:
+            return "empty"
+        if size == 1:
+            return "index 0 (count=1)"
+        return f"index 0 -> {size - 1} (count={size})"
+
+    return "not found"
+
+
+def _find_dataset_name(ds, candidates):
+    """依常見命名順序找出 dataset 內存在的維度或座標名稱。"""
+    for name in candidates:
+        if name in ds.sizes or name in ds.coords:
+            return name
+    return None
+
+
+def _print_dataset_info(ds):
+    """載入後列印資料集摘要，方便確認成員與時間範圍。"""
+    dim_info = ", ".join(f"{name}={size}" for name, size in ds.sizes.items())
+    coord_names = ", ".join(ds.coords) if ds.coords else "(none)"
+    data_var_names = ", ".join(ds.data_vars) if ds.data_vars else "(none)"
+    member_name = _find_dataset_name(ds, ["member", "ens", "ensemble", "member_id"])
+    time_name = _find_dataset_name(ds, ["Time", "time", "XTIME", "datetime"])
+
+    print("[INFO] loaded dataset summary")
+    print(f"    sizes     : {dim_info if dim_info else '(scalar dataset)'}")
+    print(f"    coords    : {coord_names}")
+    print(f"    data_vars : {data_var_names}")
+    print(f"    member    : {_format_coord_range(ds, member_name) if member_name else 'not found'}")
+    print(f"    time      : {_format_coord_range(ds, time_name) if time_name else 'not found'}")
+
+
 def _member_suffix(member_names):
     """把 member 清單轉成輸出 suffix；選取全部成員時不加 suffix。"""
     if member_names is None:
@@ -162,17 +320,31 @@ def _build_config(args, member_names):
     base_run_name = args.run_name or _infer_run_name(input_path)
     member_suffix = _member_suffix(member_names)
     run_name = f"{base_run_name}{member_suffix}"
+    member_selection = (
+        "all"
+        if args.member_names and args.member_names[0].lower() == "all"
+        else None
+    )
     output_root = Path("output-plot_WRF_rainfall")
 
     return {
         "run_name": run_name,
         "input_path": input_path,
         "member_names": member_names,
+        "member_selection": member_selection,
         "output_root": output_root,
         "end_time": args.end_time,
         "delta_t": args.delta_t,
         "cmap": args.cmap,
         "map_name": "rain2",
+        "plot_statistics": {
+            "std": args.plot_std,
+            "max": args.plot_max,
+            "min": args.plot_min,
+            "q1": args.plot_q1,
+            "median": args.plot_median,
+            "q3": args.plot_q3,
+        },
     }
 
 
@@ -181,37 +353,52 @@ def _load_rainfall_dataset(config):
     input_path = config["input_path"]
     print(f"Loading data from: {input_path}")
     ds = xr.open_dataset(input_path).squeeze()
-    return _select_members(ds, config["member_names"])
+    ds = _select_members(ds, config["member_names"])
+    _print_dataset_info(ds)
+    return ds
 
 
-def _build_output_path(output_root, run_name, end_time, delta_t):
-    """建立 {T}_{dT}.png 路徑，並替換 Windows 檔名不允許的符號。"""
+def _build_output_filename(end_time, delta_t):
+    """建立 {T}_{dT}.png 檔名，並替換 Windows 檔名不允許的符號。"""
     safe_end_time = re.sub(r'[<>:"/\\|?*\s]+', "_", str(end_time)).strip("._")
-    return output_root / run_name / f"{safe_end_time}_{delta_t}.png"
-
-
-def _move_output_figure(generated_path, target_path):
-    """將底層函式的既有檔名改成這支程式指定的 {T}_{dT}.png。"""
-    generated_path = Path(generated_path)
-    if generated_path == target_path:
-        return target_path
-
-    target_path.parent.mkdir(parents=True, exist_ok=True)
-    generated_path.replace(target_path)
-    return target_path
+    return f"{safe_end_time}_{delta_t}.png"
 
 
 def _plot_accumulated_rainfall(ds, config):
-    """依外部輸入的結束時間與累積時數輸出一張系集平均累積雨量圖。"""
+    """輸出系集平均累積雨量圖，並依選用旗標額外輸出統計場。"""
     run_name = config["run_name"]
     output_root = config["output_root"]
     end_time = config["end_time"]
     delta_t = config["delta_t"]
     cmap = config["cmap"]
+    plot_statistics = config["plot_statistics"]
     map_config = mydef.set_ll(config["map_name"])
+    calculation_kwargs = {
+        "calculate_sample_std": plot_statistics["std"],
+        "calculate_max": plot_statistics["max"],
+        "calculate_min": plot_statistics["min"],
+        "calculate_q1": plot_statistics["q1"],
+        "calculate_median": plot_statistics["median"],
+        "calculate_q3": plot_statistics["q3"],
+    }
+    output_filename = _build_output_filename(end_time, delta_t)
 
     # 判斷成員數，若大於一個成員則設定對member維度計算平均
     dim_name_mean = "member" if ds.sizes.get("member", 0) > 1 else None
+    system_time_suffix = None
+    show_member_count = (
+        config["member_selection"] == "all"
+        or (
+            config["member_names"] is not None
+            and len(config["member_names"]) > 1
+        )
+    )
+    if show_member_count:
+        member_count = ds.sizes.get("member", 1)
+        if config["member_selection"] == "all":
+            system_time_suffix = f"Es: all ({member_count})"
+        else:
+            system_time_suffix = f"Es: ({member_count})"
 
     print(f"\nTarget Output Directory: {output_root / run_name}\n")
     print(
@@ -228,14 +415,14 @@ def _plot_accumulated_rainfall(ds, config):
         run_name=run_name,
         dim_name_mean=dim_name_mean,
         mycmap_str=cmap,
+        output_filename=output_filename,
+        system_time_suffix=system_time_suffix,
+        **calculation_kwargs,
     )
 
-    target_path = _build_output_path(output_root, run_name, end_time, delta_t)
-    output_path = _move_output_figure(result["out_path"], target_path)
-
-    print(f"    -> Output figure: {output_path}")
-    print(f"    -> Max rainfall : {result['max_shd']:.2f}")
-    print(f"    -> Max lon/lat  : {result['max_lon']:.2f}, {result['max_lat']:.2f}\n")
+    print(f"-> Output main figure: {result['out_path']}")
+    print(f"    Max rainfall : {result['max_shd']:.2f}")
+    print(f"    Max lon/lat  : {result['max_lon']:.2f}, {result['max_lat']:.2f}\n")
 
 
 def main():
@@ -255,7 +442,7 @@ def main():
 
     try:
         # -------------------------------------------------------------------------
-        # 繪製指定結束時間與累積時數的雨量圖
+        # 繪製平均累積雨量圖與選用的統計量圖
         _plot_accumulated_rainfall(ds, config)
     finally:
         ds.close()
@@ -263,6 +450,7 @@ def main():
     # -------------------------------------------------------------------------
     # 完成訊息
     print(f">> [DONE] {SCRIPT_PATH} <<")
+    
 
 
 if __name__ == "__main__":

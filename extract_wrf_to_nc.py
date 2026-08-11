@@ -5,11 +5,13 @@
 # 檔名: extract_wrf_to_nc.py
 # 功能: 從WRF輸出檔案中提取指定變數並轉存為NetCDF檔案 (支援網格插值)
 # 作者: CYC
+# AI助手: Codex 5.6 sol
 # 建立日期: 2025-06-11
 # 更新日期: 2025-06-14 - 新增網格插值功能 + WRF全域屬性提取功能(全屬性版本) + 系集/時間平均功能
 # 更新日期: 2025-06-15 - 優化提取迴圈in wrfdata_sel
 # 更新日期: 2025-06-22 - 增加平均之後保留的屬性
 # 更新日期: 2026-06-22 - [v1.5] - 擴充支援: 可讀取不是在member資料夾下的wrfout
+# 更新日期: 2026-08-07 - [v1.8] - 新增輸出檔案覆蓋控制，預設不覆蓋
 #
 # Description:
 #   此程式可以從WRF系集輸出中提取指定domain、系集成員、時間點、氣壓層的資料，
@@ -35,8 +37,8 @@ from netCDF4 import Dataset
 import pandas as pd
 from scipy.interpolate import griddata  # 新增：用於網格插值
 
-SCRIPT_VERSION = "v1.7"
-SCRIPT_UPDATE_DATE = "2026-07-03"
+SCRIPT_VERSION = "v1.8"
+SCRIPT_UPDATE_DATE = "2026-08-07"
 
 def parse_arguments():
     """解析命令列參數"""
@@ -110,6 +112,8 @@ Update: {SCRIPT_UPDATE_DATE} [{SCRIPT_VERSION}]
                        help='輸出NetCDF檔案名稱 (預設: extract_wrf_multi_vars)')
     parser.add_argument('-c', '--compression', type=int, default=0,
                        help='壓縮等級 0-9，0表示不壓縮 (預設: 0)')
+    parser.add_argument('--overwrite', action='store_true',
+                       help='輸出檔案已存在時覆蓋寫出 (預設: False，不覆蓋並跳過)')
 
     return parser.parse_args()
 
@@ -2035,6 +2039,45 @@ def main():
             levels = [-9999]  # 特殊值表示地面變數
         else:
             levels = [float(l.strip()) for l in args.levels.split(',')]
+
+        # -----------------
+        # 準備輸出檔案路徑並檢查是否已存在
+        # -----------------
+        output_path = None
+        if args.output_file:
+            output_path = os.path.join(output_dir, args.output_file)
+
+            # 根據處理操作自動調整檔名
+            if args.Emean or args.Tmean or args.lonlat_grid:
+                base_name, ext = os.path.splitext(args.output_file)
+                suffix = ""
+                if args.lonlat_grid:
+                    # 從網格參數生成簡短的標識
+                    ll_parts = args.lonlat_grid.split(',')
+                    if len(ll_parts) >= 5:
+                        grid_id = f"grid{ll_parts[4]}"  # 使用解析度作為標識
+                        suffix += f"_{grid_id}"
+                if args.Emean:
+                    # 系集平均
+                    suffix += "_Emean"
+                if args.Tmean:
+                    # 時間平均
+                    suffix += "_Tmean"
+                if levels[0] == -9999:
+                    # 地面層
+                    suffix += "_surface"
+                output_path = os.path.join(output_dir, f"{base_name}{suffix}{ext}")
+                print(f"    Output filename adjusted for processing: {os.path.basename(output_path)}")
+
+            # 確保檔案有.nc副檔名
+            if not output_path.endswith('.nc'):
+                output_path += '.nc'
+
+            if os.path.exists(output_path):
+                if not args.overwrite:
+                    print(f"[SKIP] Existing output: {output_path}")
+                    return None
+                print(f"Overwrite existing output: {output_path}")
         
         # 解析系集成員參數
         ensemble_members = [int(e.strip()) for e in args.ensemble.split(',')]
@@ -2146,34 +2189,6 @@ def main():
             print(f"== Save to NC File ==")
             print(f"{'='*50}")
 
-            output_path = os.path.join(output_dir, args.output_file)
-            
-            # 根據處理操作自動調整檔名
-            if args.Emean or args.Tmean or args.lonlat_grid:
-                base_name, ext = os.path.splitext(args.output_file)
-                suffix = ""
-                if args.lonlat_grid:
-                    # 從網格參數生成簡短的標識
-                    ll_parts = args.lonlat_grid.split(',')
-                    if len(ll_parts) >= 5:
-                        grid_id = f"grid{ll_parts[4]}"  # 使用解析度作為標識
-                        suffix += f"_{grid_id}"
-                if args.Emean:
-                    # 系集平均
-                    suffix += "_Emean"
-                if args.Tmean:
-                    # 時間平均
-                    suffix += "_Tmean"
-                if levels[0] == -9999:
-                    # 地面層
-                    suffix += "_surface"
-                output_path = os.path.join(output_dir, f"{base_name}{suffix}{ext}")
-                print(f"    Output filename adjusted for processing: {os.path.basename(output_path)}")
-            
-            # 確保檔案有.nc副檔名
-            if not output_path.endswith('.nc'):
-                output_path += '.nc'
-            
             # *** 新增WRF全域屬性相關參數 ***
             save_to_netcdf(
                 data=extracted_dataset, 
@@ -2190,11 +2205,16 @@ def main():
         print(f"\n{'='*99}")
         print(f"== Multi-variable extraction with grid interpolation and averaging completed done ==")
         print(f"{'='*99}")
+
+        if output_path:
+            print(f"[DONE] Output file: {output_path}")
+        else:
+            print(f"[DONE] Data extraction completed without output file.")
         
         return extracted_dataset
         
     except Exception as e:
-        print(f"\nError during extraction: {str(e)}")
+        print(f"\n[ERROR] Error during extraction: {str(e)}")
         sys.exit(1)
 #===============================================================
 

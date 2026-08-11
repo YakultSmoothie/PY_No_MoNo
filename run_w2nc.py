@@ -214,6 +214,8 @@ def main() -> int:
                     ]
                     if args.decompose_multi:
                         cmd.append("--decompose_multi")
+                    if args.overwrite:
+                        cmd.append("--overwrite")
                     if args.lonlat_grid:
                         cmd.extend(["-LL", args.lonlat_grid])
 
@@ -221,7 +223,7 @@ def main() -> int:
                     print(f"Output: {target_file}")
 
                     if target_file.exists() and not args.overwrite:
-                        print(f"Skip existing output: {target_file}")
+                        print(f"[SKIP] Existing output: {target_file}")
                         continue
 
                     if args.dry_run:
