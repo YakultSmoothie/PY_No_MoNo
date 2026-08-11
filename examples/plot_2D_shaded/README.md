@@ -73,7 +73,7 @@ Fast 2D array visualization with automatic statistics and multi-format input sup
 
 **If you have useful examples to share:**
 
-1. Share your example link (UpNote, Colab, Gist, etc.), or
+1. Share your example link (Colab, Gist, etc.), or
 2. Submit a pull request or open an issue
 
 
