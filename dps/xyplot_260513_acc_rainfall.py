@@ -60,6 +60,8 @@ def _plot_acc_rainfall_map(
     ax=None,
     fig=None,
     field_label=None,
+    system_time_suffix=None,
+    rainfall_source=None,
     ):
     """
     Draw one accumulated-rainfall field and annotate time and its spatial maximum.
@@ -124,13 +126,20 @@ def _plot_acc_rainfall_map(
         color='white',
     )
 
+    run_info = f"run: {run_name}"
+    if system_time_suffix:
+        run_info = f"{run_info} | {system_time_suffix}"
+
+    # 組合 system info 中的執行資訊與降水來源
+    system_time_info = [run_info]
+    if rainfall_source:
+        system_time_info.append(f"R: {rainfall_source}")
+    if field_label is not None:
+        system_time_info.append(f"statistic: {field_label}")
+
     mydef.add_system_time(
         fig=result['fig'],
-        system_time_info=(
-            f"run: {run_name}"
-            if field_label is None
-            else [f"run: {run_name}", f"statistic: {field_label}"]
-        ),
+        system_time_info=system_time_info,
         offset=(-0.2, -0.1),
     )
 
@@ -205,6 +214,8 @@ def _plot_and_save_rainfall_field(
     ax=None,
     fig=None,
     field_label=None,
+    system_time_suffix=None,
+    rainfall_source=None,
 ):
     """使用共用平面圖函式繪製、標註並儲存一個累積雨量資料場。"""
     maximum = _get_field_maximum(data)
@@ -222,6 +233,8 @@ def _plot_and_save_rainfall_field(
         ax=ax,
         fig=fig,
         field_label=field_label,
+        system_time_suffix=system_time_suffix,
+        rainfall_source=rainfall_source,
     )
 
     mydef.f2p(result["fig"], out_path)
@@ -352,6 +365,7 @@ def xyplot_260513_acc_rainfall(
     calculate_q3=False,
     output_filename=None,
     return_rainfall_by_sample=False,
+    system_time_suffix=None,
     ):
     """
     Plot accumulated rainfall from WRF cumulative rainfall variables.
@@ -359,7 +373,8 @@ def xyplot_260513_acc_rainfall(
     Parameters
     ----------
     ds : xarray.Dataset
-        Dataset containing RAINNC, RAINC, XLONG, and XLAT.
+        Dataset containing RAINC, RAINNC, or both, together with XLONG and
+        XLAT.
     delta_T : int or float
         Accumulation period in hours.
     end_time : str or datetime-like
@@ -408,6 +423,9 @@ def xyplot_260513_acc_rainfall(
         Basename used for the mean-rainfall output under output_root/run_name.
         Statistic suffixes are inserted before its extension. If None, retain
         the existing compact-time filename.
+    system_time_suffix : str, optional
+        Additional text appended to the run label in system-time annotations.
+        Default is None.
     return_rainfall_by_sample : bool, optional
         If True, return rainfall_by_sample immediately after it is calculated,
         without subsequent statistics, averaging, or plotting. Default is False.
@@ -454,6 +472,24 @@ def xyplot_260513_acc_rainfall(
     print(f"    dataset coords = {list(ds.coords)}")
     print(f"    dataset data_vars = {list(ds.data_vars)}")
 
+    # 偵測可用的累積降水變數
+    rain_variable_names = tuple(
+        variable_name
+        for variable_name in ('RAINNC', 'RAINC')
+        if variable_name in ds.data_vars
+    )
+    if rain_variable_names == ('RAINNC', 'RAINC'):
+        rainfall_source = 'RAINNC + RAINC'
+    elif rain_variable_names == ('RAINNC',):
+        rainfall_source = 'RAINNC only'
+    elif rain_variable_names == ('RAINC',):
+        rainfall_source = 'RAINC only'
+    else:
+        raise ValueError(
+            "The input dataset must contain RAINC, RAINNC, or both."
+        )
+    print(f"[INFO] rainfall source = {rainfall_source}")
+
     # 空間選取
     spatial_mask = mydef.get_spatial_mask(ds.XLONG, ds.XLAT, map_config['gxylim'])
 
@@ -465,15 +501,20 @@ def xyplot_260513_acc_rainfall(
         'south_north': spatial_mask['y_slice'],
     }
 
-    # 僅選取起訖時間與指定空間範圍，再計算各時間點的累積雨量
-    rain_end = (
-        ds['RAINNC'].sel(Time=end_time).isel(**spatial_indexer)
-        + ds['RAINC'].sel(Time=end_time).isel(**spatial_indexer)
+    # 僅選取起訖時間與指定空間範圍，再合併可用的累積降水變數
+    rain_end = ds[rain_variable_names[0]].sel(Time=end_time).isel(
+        **spatial_indexer
     )
-    rain_start = (
-        ds['RAINNC'].sel(Time=start_time).isel(**spatial_indexer)
-        + ds['RAINC'].sel(Time=start_time).isel(**spatial_indexer)
+    rain_start = ds[rain_variable_names[0]].sel(Time=start_time).isel(
+        **spatial_indexer
     )
+    if len(rain_variable_names) == 2:
+        rain_end = rain_end + ds[rain_variable_names[1]].sel(
+            Time=end_time
+        ).isel(**spatial_indexer)
+        rain_start = rain_start + ds[rain_variable_names[1]].sel(
+            Time=start_time
+        ).isel(**spatial_indexer)
 
     # 先計算每個樣本的時段累積雨量
     rainfall_by_sample = rain_end - rain_start
@@ -558,6 +599,8 @@ def xyplot_260513_acc_rainfall(
         out_path=out_path,
         ax=ax,
         fig=fig,
+        system_time_suffix=system_time_suffix,
+        rainfall_source=rainfall_source,
     )
 
     # ----------- plot selected statistics -----------
@@ -584,6 +627,8 @@ def xyplot_260513_acc_rainfall(
             ax=None,
             fig=None,
             field_label=spec["title"],
+            system_time_suffix=system_time_suffix,
+            rainfall_source=rainfall_source,
         )
 
     # ----------- return ----------- 

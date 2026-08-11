@@ -6,7 +6,7 @@ import pandas as pd
 
 import matplotlib
 # matplotlib.use('Agg')  # 強制使用 Agg 後端
-matplotlib.use('TkAgg') # 或 'Qt5Agg'
+# matplotlib.use('TkAgg') # 或 'Qt5Agg'
 import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
 import matplotlib.dates as mdates
