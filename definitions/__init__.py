@@ -12,6 +12,7 @@ from .calculate_latitude_weighted_mean import *
 from .calculate_significance_mask_vectorized import *
 from .calculate_anomaly import *
 from .calculate_correlation import *
+from .calculate_linear_regression import calculate_linear_regression
 from .calc_cross_section_winds import *
 from .setup_pressure_axis import *
 from .set_ll import *
@@ -27,9 +28,16 @@ from .get_dico_names import *
 from .taiwan_land_mask import *
 from .plot_lines import *
 from .get_distance_path import *
+from .get_distance_from_point import *
+from .get_angle_from_point import *
+from .get_lonlat_2d import *
+from .subset_spatial_region import *
 from .mask_lon_lat_by_path import *
 from .nlon import *
 from .make_analysis_key import make_analysis_key
+from .calculate_wrfgrid_rotation import calculate_wrfgrid_rotation
+from .mean_pressure_weighted_xr import mean_pressure_weighted_xr
+from .mean_pressure_weighted_xr_fast import mean_pressure_weighted_xr_fast
 
 # 常用別名
 p2d = plot_2D_shaded
@@ -52,6 +60,7 @@ __all__ = [
     "calculate_significance_mask_vectorized",
     "calculate_anomaly",
     "calculate_correlation",
+    "calculate_linear_regression",
     "calc_cross_section_winds",
     "setup_pressure_axis",
     "set_ll",
@@ -68,9 +77,16 @@ __all__ = [
     "mask_taiwan_land",
     "plot_lines",
     "get_distance_path",
+    "get_distance_from_point",
+    "get_angle_from_point",
+    "get_lonlat_2d",
+    "subset_spatial_region",
     "mask_lon_lat_by_path",
     "nlon",
     "make_analysis_key",
+    "calculate_wrfgrid_rotation",
+    "mean_pressure_weighted_xr",
+    "mean_pressure_weighted_xr_fast",
     "pln",
     "p2d",
     "p2d_quick_save_kwargs",

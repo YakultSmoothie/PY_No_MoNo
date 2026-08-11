@@ -44,11 +44,12 @@ def calculate_orientation_angle_spherical(lat1, lon1, lat2, lon2):
     
     Returns:
     --------
-    float : 指向（度）
+    float or numpy.ndarray : 指向（度）
         0° = 正東（East）
         90° = 正北（North）
         180° = 正西（West）
         270° = 正南（South）
+        重合點與對蹠點沒有唯一指向，因此回傳 NaN。
     """
     import numpy as np
 
@@ -71,13 +72,28 @@ def calculate_orientation_angle_spherical(lat1, lon1, lat2, lon2):
     
     # 確保角度在 0-360 度範圍內
     orientation = orientation % 360
+
+    # 重合點與對蹠點的東、北方向分量皆為零，沒有唯一方位角
+    direction_magnitude = np.hypot(x, y)
+    tolerance = 8.0 * np.finfo(float).eps
+    undefined_mask = np.isclose(
+        direction_magnitude,
+        0.0,
+        rtol=0.0,
+        atol=tolerance,
+    )
+    orientation = np.where(undefined_mask, np.nan, orientation)
+
+    # 純量輸入維持回傳 float，陣列輸入則保留廣播後的 shape
+    if np.ndim(orientation) == 0:
+        return orientation.item()
     
     return orientation
 
 def calculate_orientation_angle_cartesian(lat1, lon1, lat2, lon2):
     """
     使用笛卡爾座標計算從點1到點2的指向（平面近似）
-    直接使用經緯度差異計算角度
+    使用緯度差與正規化至 [-180, 180) 的最短有號經度差計算角度
     
     Returns:
     --------
@@ -89,9 +105,9 @@ def calculate_orientation_angle_cartesian(lat1, lon1, lat2, lon2):
     """
     import numpy as np
 
-    # 計算經緯度差異
+    # 計算緯度差，並將經度差正規化以正確跨越 0/360 度接縫
     dlat = lat2 - lat1
-    dlon = lon2 - lon1
+    dlon = np.remainder(lon2 - lon1 + 180.0, 360.0) - 180.0
     
     # 使用 arctan2 計算角度（從東方逆時針）
     # 注意：dlon 對應 x 軸（東西向），dlat 對應 y 軸（南北向）
@@ -172,8 +188,10 @@ def custom_cross_section(data, start, end, lons, lats, steps=101, method='linear
     
     orientation_angle = calculate_orientation_angle(start[0], start[1], end[0], end[1])
     
-    # 判斷主要方向
-    if orientation_angle < 22.5 or orientation_angle >= 337.5:
+    # 判斷主要方向；重合點與對蹠點保留未定義標記
+    if not np.isfinite(orientation_angle):
+        direction_desc = "undefined"
+    elif orientation_angle < 22.5 or orientation_angle >= 337.5:
         direction_desc = "E"
     elif 22.5 <= orientation_angle < 67.5:
         direction_desc = "NE"
