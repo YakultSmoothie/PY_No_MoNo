@@ -621,6 +621,50 @@ def _add_vector_quiverkey(ax, qu, qk_x, qk_y, vref, vector_unit_str,
 #         if zorder is not None:
 #             spine.set_zorder(zorder)
 
+
+def _get_coordinate_role(coordinate):
+    """依座標名稱與 CF 屬性辨識 longitude 或 latitude。"""
+    if coordinate is None:
+        return None
+
+    # 優先使用 xarray、pandas 等物件保留的座標名稱。
+    name = getattr(coordinate, "name", None)
+    normalized_name = re.sub(r"[^a-z0-9]", "", str(name).lower()) if name is not None else ""
+    longitude_names = {"lon", "long", "longitude", "xlon", "xlong", "xlongm"}
+    latitude_names = {"lat", "latitude", "xlat", "xlatm"}
+    if normalized_name in longitude_names:
+        return "longitude"
+    if normalized_name in latitude_names:
+        return "latitude"
+
+    # 名稱不足時使用 CF standard_name、long_name 與角度單位判斷。
+    attrs = getattr(coordinate, "attrs", {})
+    if not hasattr(attrs, "get"):
+        return None
+
+    standard_name = str(attrs.get("standard_name", "")).strip().lower()
+    long_name = str(attrs.get("long_name", "")).strip().lower()
+    units = re.sub(r"[\s_-]", "", str(attrs.get("units", "")).strip().lower())
+
+    if standard_name == "longitude" or "longitude" in long_name:
+        return "longitude"
+    if standard_name == "latitude" or "latitude" in long_name:
+        return "latitude"
+    if units in {"degreeeast", "degreeseast", "degreee", "degreese"}:
+        return "longitude"
+    if units in {"degreenorth", "degreesnorth", "degreen", "degreesn"}:
+        return "latitude"
+
+    return None
+
+
+def _xy_are_longitude_latitude(x, y):
+    """確認 x、y 是否分別帶有可辨識的經度與緯度 metadata。"""
+    return (
+        _get_coordinate_role(x) == "longitude"
+        and _get_coordinate_role(y) == "latitude"
+    )
+
 #--------------------------------------------
 # 視覺化一個輸入陣列  ++ MAIN FUNCTION ++
 #--------------------------------------------
@@ -689,7 +733,7 @@ def plot_2D_shaded(array, x=None, y=None,
                    # coastline
                    coastline_color=('black', 'yellow'),  # When coastline_color=None, do not draw coastline
                    coastline_width=(2.0, 0.0), 
-                   coastline_resolution='50m',
+                   coastline_resolution='auto',
 
                    # grid line
                    grid=True, 
@@ -839,22 +883,27 @@ def plot_2D_shaded(array, x=None, y=None,
         coastline_width (tuple): 海岸線寬度(外層, 內層)，預設(2.0, 0.0)
             - (外層線寬, 內層線寬)，外層應略粗於內層
             例如：(2.0, 0.3), (1.5, 1.0)        
-        coastline_resolution (str): 海岸線解析度，預設'50m'
+        coastline_resolution (str): 海岸線解析度，預設'auto'
+            - 'auto': 由 Cartopy 根據地圖顯示範圍自動選擇解析度
             - '10m': 高解析度，適合區域地圖
             - '50m': 中解析度，適合一般用途
             - '110m': 低解析度，適合全球地圖        
         grid (bool): 是否顯示網格線，預設True        
         grid_type (int or str or None): 網格線繪製類型，預設None（自動判斷）
-            - None: 根據投影類型自動選擇
+            - None: 根據 x/y metadata 與投影類型自動選擇
+                * x/y 可辨識為經緯度，且沒有衝突的地圖投影 → 使用類型3
+                * PlateCarree投影 → 使用類型3
                 * LambertConformal投影 → 使用類型2
-                * 其他投影 → 使用類型1
+                * 其他情況 → 使用類型1
             - 1 或 'basic': 使用基本網格線(ax.grid)
                 * 適用於PlateCarree等簡單投影
                 * 繪製簡單的格線，不帶經緯度標籤
             - 2 或 'Lambert': 使用帶標籤的gridlines
                 * 適用於LambertConformal投影
                 * 自動在圖邊緣標註經緯度
-                * 支援經緯線定位與格式化        
+                * 支援經緯線定位與格式化
+            - 3 或 'Lat-Lon': 使用 PlateCarree 經緯度網格線與標籤
+        gt (int or str or None): grid_type 的簡寫；僅在 grid_type 未指定時使用
         grid_int (tuple or None): 網格線間隔(經度間隔, 緯度間隔)，預設None（自動設定）
             - None: 根據coastline_resolution自動設定
                 * '10m'  → (1, 1)
@@ -1066,6 +1115,8 @@ def plot_2D_shaded(array, x=None, y=None,
             例如：user_info_color='white', user_info_stroke_color='black'   
 
     == Update ==
+    v1.21.10 2026-08-12 coastline_resolution 預設改用 Cartopy 原生 auto
+    v1.21.9 2026-08-12 未指定 grid_type/gt 時，依 x/y 經緯度 metadata 自動使用類型3
     v1.21.8 2026-07-29 修正單組clevels被誤判為多組等值線設定
     v1.21.7 2026-07-13 精簡 silent=True 輸出為 p2d 統計摘要
     v1.21.6 2026-07-06 增加 p2d_quick_save_kwargs 快速存檔參數字典 helper
@@ -1299,6 +1350,21 @@ def plot_2D_shaded(array, x=None, y=None,
     stats['valid_percent'] = valid_percent = 100 - nan_percent
 
     grid_type = grid_type or gt
+
+    # 未明確指定網格類型時，以 x/y metadata 自動辨識經緯度座標。
+    axes_projection = getattr(ax, "projection", None) if ax is not None else None
+    active_projection = projection if projection is not None else axes_projection
+    projection_allows_latlon_grid = (
+        active_projection is None
+        or isinstance(active_projection, ccrs.PlateCarree)
+    )
+    if (
+        grid_type is None
+        and projection_allows_latlon_grid
+        and _xy_are_longitude_latitude(x, y)
+    ):
+        grid_type = 3
+        print(f"{ind2}    auto grid type: 3 (x/y recognized as longitude/latitude)")
 
     if (grid_type == 3) or (grid_type == 'Lat-Lon'):
         if projection is None:
@@ -1544,11 +1610,11 @@ def plot_2D_shaded(array, x=None, y=None,
     if transform is not None and coastline_color is not None:
         
         # --- 解析度合法性檢查 ---
-        valid_resolutions = ['110m', '50m', '10m']
+        valid_resolutions = ['auto', '110m', '50m', '10m']
         if coastline_resolution not in valid_resolutions:
             if not silent:
-                print(f"{ind2}警告: 無效的解析度 '{coastline_resolution}'，已自動修正為 '50m'")
-            coastline_resolution = '50m'
+                print(f"{ind2}警告: 無效的解析度 '{coastline_resolution}'，已自動修正為 'auto'")
+            coastline_resolution = 'auto'
         # ----------------------------
 
         print(f"{ind2}draw coastline: color: {coastline_color}, width: {coastline_width}")   

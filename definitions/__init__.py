@@ -31,7 +31,10 @@ from .get_distance_path import *
 from .get_distance_from_point import *
 from .get_angle_from_point import *
 from .get_lonlat_2d import *
+from .get_w2nc_projection import *
+from .history import *
 from .subset_spatial_region import *
+from .subset_dataset_coordinates import *
 from .mask_lon_lat_by_path import *
 from .nlon import *
 from .make_analysis_key import make_analysis_key
@@ -47,6 +50,7 @@ ari = array_info
 q2x = quantity_to_xarray
 auit = add_user_info_text
 lwnc = load_w2nc_layers
+sds = subset_dataset_coordinates
 
 __all__ = [
     "plot_2D_shaded",
@@ -80,7 +84,10 @@ __all__ = [
     "get_distance_from_point",
     "get_angle_from_point",
     "get_lonlat_2d",
+    "get_w2nc_projection",
+    "history",
     "subset_spatial_region",
+    "subset_dataset_coordinates",
     "mask_lon_lat_by_path",
     "nlon",
     "make_analysis_key",
@@ -94,4 +101,5 @@ __all__ = [
     "ari",
     "q2x",
     "auit",
+    "sds",
 ]

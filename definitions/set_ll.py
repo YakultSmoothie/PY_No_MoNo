@@ -19,7 +19,7 @@ def set_ll(region_type: str,
             - c_args (tuple): (clo, cla, dclo, dcla) 用於 'c' (中心點) 模式。
             
     回傳:
-        DualAccessDict: 包含 'gxylim' (tuple) 與 'coastline_resolution' (str) 與 'grid_int' (tuple) 
+        DualAccessDict: 包含 'gxylim' (tuple) 與 'grid_int' (tuple)
 
     create: 2026-04-29
     update: 2026-05-05, YakultSmoothie, As grid_int = None, remove it from return DualAccessDict
@@ -89,12 +89,12 @@ def set_ll(region_type: str,
     dlo = lon2 - lon1
     dla = lat2 - lat1
     
-    if dlo > 40 or dla > 40:
-        resolution = '110m'  # 低解析度，適合全球地圖
-    elif dlo > 15 or dla > 15:
-        resolution = '50m'   # 中解析度，適合一般用途
-    else:
-        resolution = '10m'   # 高解析度，適合區域地圖
+#    if dlo > 40 or dla > 40:
+#        resolution = '110m'  # 低解析度，適合全球地圖
+#    elif dlo > 15 or dla > 15:
+#        resolution = '50m'   # 中解析度，適合一般用途
+#    else:
+#        resolution = '10m'   # 高解析度，適合區域地圖
         
     gxylim = (lon1, lon2, lat1, lat2)
 
@@ -103,7 +103,7 @@ def set_ll(region_type: str,
     # 建立初始資料字典
     data = {
         'gxylim': gxylim,
-        'coastline_resolution': resolution,
+        # 'coastline_resolution': resolution,
         'grid_int': grid_int
     }
 

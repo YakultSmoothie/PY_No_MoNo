@@ -9,7 +9,6 @@ import numpy as np
 import xarray as xr
 
 from .DualAccessDict import DualAccessDict
-from .get_spatial_mask import get_spatial_mask
 from .mask_lon_lat_by_path import mask_lon_lat_by_path
 
 
@@ -43,8 +42,8 @@ def calculate_latitude_weighted_mean(
     lats : numpy.ndarray or xarray.DataArray
         二維緯度陣列，形狀必須與 ``value`` 的最後兩維相同。
     extent : sequence of four floats, "all", or None, default=None
-        平均區域 ``(lon_min, lon_max, lat_min, lat_max)``。區域遮罩由
-        ``get_spatial_mask`` 以 ``expand_grid=0`` 建立；傳入 ``"all"``
+        平均區域 ``(lon_min, lon_max, lat_min, lat_max)``。直接依每個
+        網格點的經緯度判斷，並包含 extent 邊界；傳入 ``"all"``
         時使用完整網格。設為 ``None`` 時不建立 extent 遮罩，此時必須
         提供 ``path_lons`` 與 ``path_lats``。
     latitude_weighted : bool, default=True
@@ -70,6 +69,8 @@ def calculate_latitude_weighted_mean(
            ``value`` 為 xarray DataArray 時，保留其他維度及其座標。
         1. ``mask``：有效經緯度、選用 ``extent`` 及路徑經集合運算後的
            二維布林遮罩。
+        2. ``final_mask``：最終用於空間平均的二維布林遮罩，內容與
+           ``mask`` 相同；保留 ``mask`` 以相容既有程式碼。
 
     Raises
     ------
@@ -154,22 +155,30 @@ def calculate_latitude_weighted_mean(
             )
         spatial_extent = tuple(float(bound) for bound in extent)
 
+    if spatial_extent == "all":
+        print("[extent] all")
+    elif spatial_extent is not None:
+        lon_min, lon_max, lat_min, lat_max = spatial_extent
+        print(
+            f"[extent] lon: {lon_min} ~ {lon_max} | "
+            f"lat: {lat_min} ~ {lat_max} "
+        )
+
     # 有效經緯度網格是所有補集運算使用的全集
     valid_grid_mask = np.isfinite(lons_array) & np.isfinite(lats_array)
 
     # extent 與 path 分別建立遮罩，最後才依指定集合運算合併
     extent_mask = None
-    if spatial_extent is not None:
-        spatial_mask = get_spatial_mask(
-            lons=lons,
-            lats=lats,
-            extent=spatial_extent,
-            expand_grid=0,
-            silent=True,
-        )
+    if spatial_extent == "all":
+        extent_mask = valid_grid_mask.copy()
+    elif spatial_extent is not None:
+        lon_min, lon_max, lat_min, lat_max = spatial_extent
         extent_mask = (
             valid_grid_mask
-            & np.asarray(spatial_mask["mask"], dtype=bool)
+            & (lons_array >= lon_min)
+            & (lons_array <= lon_max)
+            & (lats_array >= lat_min)
+            & (lats_array <= lat_max)
         )
 
     path_mask = None
@@ -292,4 +301,5 @@ def calculate_latitude_weighted_mean(
     return DualAccessDict({
         "result": mean_result,
         "mask": mask,
+        "final_mask": mask,
     })
